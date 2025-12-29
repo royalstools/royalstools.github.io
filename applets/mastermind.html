@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mastermind Game</title>
+    <title>Mastermind</title>
     <style>
         * {
             margin: 0;
@@ -27,38 +27,94 @@
             width: 100%;
         }
 
+        header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
         h1 {
             text-align: center;
-            margin-bottom: 20px;
             font-size: 2.5rem;
             text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
         }
 
-        .settings {
+        .settings-btn {
+            position: absolute;
+            right: 0;
             background: rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-            backdrop-filter: blur(10px);
+            border: none;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            cursor: pointer;
+            font-size: 1.5rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .settings h2 {
-            margin-bottom: 15px;
-            font-size: 1.2rem;
+        .settings-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: rotate(45deg);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 400px;
+            width: 90%;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal h2 {
+            margin-bottom: 20px;
+            text-align: center;
         }
 
         .setting-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
 
         .setting-row label {
             font-size: 0.95rem;
         }
 
-        .setting-row input {
+        .setting-row input[type="number"] {
             width: 80px;
             padding: 8px;
             border: none;
@@ -69,8 +125,29 @@
             font-size: 1rem;
         }
 
-        .setting-row input:focus {
+        .setting-row input[type="number"]:focus {
             outline: 2px solid #4fc3dc;
+        }
+
+        .setting-row input[type="checkbox"] {
+            width: 22px;
+            height: 22px;
+            cursor: pointer;
+            accent-color: #4fc3dc;
+        }
+
+        .setting-description {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            margin-top: -10px;
+            margin-bottom: 15px;
+            padding-left: 5px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
         }
 
         .btn {
@@ -86,8 +163,7 @@
         .btn-primary {
             background: linear-gradient(135deg, #4fc3dc 0%, #0fadcf 100%);
             color: #1a1a2e;
-            width: 100%;
-            margin-top: 10px;
+            flex: 1;
         }
 
         .btn-primary:hover {
@@ -95,16 +171,21 @@
             box-shadow: 0 5px 20px rgba(79, 195, 220, 0.4);
         }
 
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            flex: 1;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
         .game-area {
             background: rgba(255, 255, 255, 0.1);
             border-radius: 15px;
             padding: 20px;
             backdrop-filter: blur(10px);
-            display: none;
-        }
-
-        .game-area.active {
-            display: block;
         }
 
         .status {
@@ -126,6 +207,28 @@
             color: #e74c3c;
         }
 
+        .mode-indicator {
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .mode-indicator.solver {
+            background: rgba(168, 85, 247, 0.2);
+            border: 1px solid rgba(168, 85, 247, 0.5);
+            color: #c084fc;
+        }
+
+        .mode-indicator.play {
+            background: rgba(79, 195, 220, 0.2);
+            border: 1px solid rgba(79, 195, 220, 0.5);
+            color: #4fc3dc;
+        }
+
         .secret-code {
             display: flex;
             justify-content: center;
@@ -137,14 +240,14 @@
         }
 
         .secret-slot {
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             background: #333;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             border: 3px solid #555;
         }
 
@@ -152,7 +255,7 @@
             border-color: #4fc3dc;
         }
 
-        .color-palette {
+        .symbol-palette {
             display: flex;
             justify-content: center;
             flex-wrap: wrap;
@@ -163,22 +266,29 @@
             border-radius: 10px;
         }
 
-        .color-option {
-            width: 45px;
-            height: 45px;
+        .symbol-option {
+            width: 55px;
+            height: 55px;
             border-radius: 50%;
             cursor: pointer;
             border: 3px solid transparent;
             transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            background: rgba(255, 255, 255, 0.1);
         }
 
-        .color-option:hover {
+        .symbol-option:hover {
             transform: scale(1.15);
+            background: rgba(255, 255, 255, 0.2);
         }
 
-        .color-option.selected {
+        .symbol-option.selected {
             border-color: #fff;
             box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.25);
         }
 
         .current-guess {
@@ -190,13 +300,17 @@
         }
 
         .guess-slot {
-            width: 50px;
-            height: 50px;
+            width: 55px;
+            height: 55px;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.1);
             border: 3px dashed rgba(255, 255, 255, 0.3);
             cursor: pointer;
             transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
         }
 
         .guess-slot:hover {
@@ -267,6 +381,68 @@
             cursor: not-allowed;
         }
 
+        .feedback-panel {
+            background: rgba(168, 85, 247, 0.15);
+            border: 1px solid rgba(168, 85, 247, 0.4);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .feedback-panel.active {
+            display: block;
+        }
+
+        .feedback-panel h3 {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            color: #c084fc;
+        }
+
+        .feedback-inputs {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 15px;
+        }
+
+        .feedback-input {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feedback-input label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9rem;
+        }
+
+        .feedback-input input {
+            width: 60px;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            text-align: center;
+            font-size: 1.2rem;
+        }
+
+        .feedback-input input:focus {
+            outline: 2px solid #a855f7;
+        }
+
+        .btn-feedback {
+            background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+            color: #fff;
+            width: 100%;
+        }
+
         .hint-info {
             background: rgba(168, 85, 247, 0.2);
             border: 1px solid rgba(168, 85, 247, 0.5);
@@ -299,7 +475,7 @@
         }
 
         .guesses {
-            max-height: 400px;
+            max-height: 350px;
             overflow-y: auto;
         }
 
@@ -320,40 +496,47 @@
             min-width: 30px;
         }
 
-        .guess-colors {
+        .guess-symbols {
             display: flex;
             gap: 6px;
         }
 
-        .guess-color {
-            width: 35px;
-            height: 35px;
+        .guess-symbol {
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             border: 2px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            background: rgba(255, 255, 255, 0.1);
         }
 
         .feedback {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, 15px);
+            display: flex;
             gap: 4px;
-            min-width: 60px;
-            justify-content: end;
+            min-width: 70px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
         }
 
         .peg {
-            width: 15px;
-            height: 15px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
         }
 
-        .peg.black {
-            background: #1a1a2e;
-            border: 2px solid #fff;
+        .peg.exact {
+            background: #22c55e;
+            border: 2px solid #4ade80;
+            box-shadow: 0 0 5px rgba(34, 197, 94, 0.5);
         }
 
-        .peg.white {
-            background: #fff;
-            border: 2px solid #ccc;
+        .peg.partial {
+            background: #f59e0b;
+            border: 2px solid #fbbf24;
+            box-shadow: 0 0 5px rgba(245, 158, 11, 0.5);
         }
 
         .peg.empty {
@@ -393,50 +576,75 @@
         }
 
         @media (max-width: 500px) {
-            .color-option {
-                width: 38px;
-                height: 38px;
+            .symbol-option {
+                width: 45px;
+                height: 45px;
+                font-size: 1.5rem;
             }
             .guess-slot {
-                width: 40px;
-                height: 40px;
+                width: 45px;
+                height: 45px;
+                font-size: 1.5rem;
             }
-            .guess-color {
-                width: 28px;
-                height: 28px;
+            .guess-symbol {
+                width: 32px;
+                height: 32px;
+                font-size: 1.1rem;
             }
             .controls {
                 gap: 8px;
             }
             .btn {
-                padding: 10px 15px;
-                font-size: 0.9rem;
+                padding: 10px 12px;
+                font-size: 0.85rem;
+            }
+            .feedback-inputs {
+                gap: 15px;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎯 Mastermind</h1>
-        
-        <div class="settings" id="settings">
-            <h2>⚙️ Game Settings</h2>
-            <div class="setting-row">
-                <label for="numColors">Number of Colors (4-10):</label>
-                <input type="number" id="numColors" min="4" max="10" value="6">
+        <header>
+            <h1>🎯 Mastermind</h1>
+            <button class="settings-btn" onclick="openSettings()" title="Settings">⚙️</button>
+        </header>
+
+        <div class="modal-overlay" id="settingsModal">
+            <div class="modal">
+                <h2>⚙️ Settings</h2>
+                <div class="setting-row">
+                    <label for="numSymbols">Number of Symbols:</label>
+                    <input type="number" id="numSymbols" min="4" max="10" value="4">
+                </div>
+                <div class="setting-row">
+                    <label for="numSlots">Code Length:</label>
+                    <input type="number" id="numSlots" min="2" max="6" value="4">
+                </div>
+                <div class="setting-row">
+                    <label for="numGuesses">Max Guesses:</label>
+                    <input type="number" id="numGuesses" min="4" max="20" value="7">
+                </div>
+                <hr style="border-color: rgba(255,255,255,0.2); margin: 15px 0;">
+                <div class="setting-row">
+                    <label for="playMode">Play Mode (computer has answer):</label>
+                    <input type="checkbox" id="playMode">
+                </div>
+                <p class="setting-description">
+                    When off: You enter feedback manually (for physical game)<br>
+                    When on: Computer generates secret code
+                </p>
+                <div class="modal-buttons">
+                    <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
+                    <button class="btn btn-primary" onclick="applySettings()">Apply & Restart</button>
+                </div>
             </div>
-            <div class="setting-row">
-                <label for="numSlots">Code Length (2-6):</label>
-                <input type="number" id="numSlots" min="2" max="6" value="4">
-            </div>
-            <div class="setting-row">
-                <label for="numGuesses">Max Guesses (4-20):</label>
-                <input type="number" id="numGuesses" min="4" max="20" value="10">
-            </div>
-            <button class="btn btn-primary" onclick="startGame()">🎮 Start Game</button>
         </div>
 
-        <div class="game-area" id="gameArea">
+        <div class="game-area">
+            <div class="mode-indicator" id="modeIndicator">🧠 Solver Mode - Enter feedback manually</div>
+            
             <div class="status" id="status">Make your guess!</div>
             
             <div class="secret-code" id="secretCode"></div>
@@ -446,7 +654,7 @@
                 <div class="hint-stats" id="hintStats"></div>
             </div>
             
-            <div class="color-palette" id="colorPalette"></div>
+            <div class="symbol-palette" id="symbolPalette"></div>
             
             <div class="current-guess" id="currentGuess"></div>
             
@@ -454,25 +662,39 @@
                 <button class="btn btn-clear" onclick="clearGuess()">🗑️ Clear</button>
                 <button class="btn btn-hint" id="hintBtn" onclick="getHint()">🧠 Hint</button>
                 <button class="btn btn-submit" id="submitBtn" onclick="submitGuess()" disabled>✓ Submit</button>
-                <button class="btn btn-primary" onclick="newGame()">🔄 New</button>
+            </div>
+
+            <div class="feedback-panel" id="feedbackPanel">
+                <h3>Enter feedback for your guess:</h3>
+                <div class="feedback-inputs">
+                    <div class="feedback-input">
+                        <label><span class="peg exact"></span> Exact:</label>
+                        <input type="number" id="exactPegs" min="0" value="0">
+                    </div>
+                    <div class="feedback-input">
+                        <label><span class="peg partial"></span> Partial:</label>
+                        <input type="number" id="partialPegs" min="0" value="0">
+                    </div>
+                </div>
+                <button class="btn btn-feedback" onclick="submitFeedback()">Submit Feedback</button>
             </div>
             
             <div class="guesses" id="guesses"></div>
             
             <div class="instructions">
                 <h3>How to Play</h3>
-                <p>🎯 Crack the secret color code!</p>
-                <p>1. Click a color, then click a slot to place it</p>
-                <p>2. Fill all slots and submit your guess</p>
-                <p>3. <strong>🧠 Use "Hint"</strong> to get an AI-suggested optimal guess!</p>
+                <p>🎯 Crack the secret code!</p>
+                <p>1. Click a symbol, then click a slot to place it</p>
+                <p>2. Submit your guess, then enter (or receive) feedback</p>
+                <p>3. <strong>🧠 Hint</strong> suggests the optimal next guess!</p>
                 <div class="peg-legend">
                     <div class="peg-legend-item">
-                        <div class="peg black"></div>
-                        <span>Correct color & position</span>
+                        <div class="peg exact"></div>
+                        <span>Correct symbol & position</span>
                     </div>
                     <div class="peg-legend-item">
-                        <div class="peg white"></div>
-                        <span>Correct color, wrong position</span>
+                        <div class="peg partial"></div>
+                        <span>Correct symbol, wrong position</span>
                     </div>
                 </div>
             </div>
@@ -480,50 +702,61 @@
     </div>
 
     <script>
-        const COLORS = [
-            '#e74c3c', // Red
-            '#3498db', // Blue
-            '#2ecc71', // Green
-            '#f1c40f', // Yellow
-            '#9b59b6', // Purple
-            '#e67e22', // Orange
-            '#1abc9c', // Teal
-            '#e91e63', // Pink
-            '#795548', // Brown
-            '#607d8b'  // Gray
-        ];
-
-        const COLOR_NAMES = [
-            'Red', 'Blue', 'Green', 'Yellow', 'Purple', 
-            'Orange', 'Teal', 'Pink', 'Brown', 'Gray'
+        const SYMBOLS = [
+            { emoji: '🏅', name: 'Medal' },
+            { emoji: '📜', name: 'Scroll' },
+            { emoji: '🍷', name: 'Wine' },
+            { emoji: '🍖', name: 'Food' },
+            { emoji: '🔵', name: 'Blue' },
+            { emoji: '🟢', name: 'Green' },
+            { emoji: '🟣', name: 'Purple' },
+            { emoji: '🟠', name: 'Orange' },
+            { emoji: '⚪', name: 'White' },
+            { emoji: '🟤', name: 'Brown' }
         ];
 
         let config = {
-            numColors: 6,
+            numSymbols: 4,
             numSlots: 4,
-            numGuesses: 10
+            numGuesses: 7,
+            playMode: false
         };
 
         let gameState = {
             secretCode: [],
             currentGuess: [],
             guesses: [],
-            selectedColor: null,
+            selectedSymbol: null,
             activeSlot: 0,
             gameOver: false,
             won: false,
             allCodes: [],
-            possibleCodes: []
+            possibleCodes: [],
+            waitingForFeedback: false
         };
 
-        function startGame() {
-            config.numColors = clamp(parseInt(document.getElementById('numColors').value) || 6, 4, 10);
+        document.addEventListener('DOMContentLoaded', () => {
+            initGame();
+        });
+
+        function openSettings() {
+            document.getElementById('numSymbols').value = config.numSymbols;
+            document.getElementById('numSlots').value = config.numSlots;
+            document.getElementById('numGuesses').value = config.numGuesses;
+            document.getElementById('playMode').checked = config.playMode;
+            document.getElementById('settingsModal').classList.add('active');
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.remove('active');
+        }
+
+        function applySettings() {
+            config.numSymbols = clamp(parseInt(document.getElementById('numSymbols').value) || 4, 4, 10);
             config.numSlots = clamp(parseInt(document.getElementById('numSlots').value) || 4, 2, 6);
-            config.numGuesses = clamp(parseInt(document.getElementById('numGuesses').value) || 10, 4, 20);
-
-            document.getElementById('settings').style.display = 'none';
-            document.getElementById('gameArea').classList.add('active');
-
+            config.numGuesses = clamp(parseInt(document.getElementById('numGuesses').value) || 7, 4, 20);
+            config.playMode = document.getElementById('playMode').checked;
+            closeSettings();
             initGame();
         }
 
@@ -533,14 +766,14 @@
 
         function generateAllCodes() {
             const codes = [];
-            const total = Math.pow(config.numColors, config.numSlots);
+            const total = Math.pow(config.numSymbols, config.numSlots);
             
             for (let i = 0; i < total; i++) {
                 const code = [];
                 let n = i;
                 for (let j = 0; j < config.numSlots; j++) {
-                    code.push(n % config.numColors);
-                    n = Math.floor(n / config.numColors);
+                    code.push(n % config.numSymbols);
+                    n = Math.floor(n / config.numSymbols);
                 }
                 codes.push(code);
             }
@@ -548,44 +781,57 @@
         }
 
         function initGame() {
-            // Generate secret code
-            gameState.secretCode = [];
-            for (let i = 0; i < config.numSlots; i++) {
-                gameState.secretCode.push(Math.floor(Math.random() * config.numColors));
+            if (config.playMode) {
+                gameState.secretCode = [];
+                for (let i = 0; i < config.numSlots; i++) {
+                    gameState.secretCode.push(Math.floor(Math.random() * config.numSymbols));
+                }
+            } else {
+                gameState.secretCode = null;
             }
 
             gameState.currentGuess = new Array(config.numSlots).fill(null);
             gameState.guesses = [];
-            gameState.selectedColor = null;
+            gameState.selectedSymbol = null;
             gameState.activeSlot = 0;
             gameState.gameOver = false;
             gameState.won = false;
+            gameState.waitingForFeedback = false;
 
-            // Initialize solver state
             gameState.allCodes = generateAllCodes();
             gameState.possibleCodes = [...gameState.allCodes];
 
-            renderColorPalette();
+            const modeIndicator = document.getElementById('modeIndicator');
+            if (config.playMode) {
+                modeIndicator.textContent = '🎮 Play Mode - Computer has the secret code';
+                modeIndicator.className = 'mode-indicator play';
+            } else {
+                modeIndicator.textContent = '🧠 Solver Mode - Enter feedback manually';
+                modeIndicator.className = 'mode-indicator solver';
+            }
+
+            renderSymbolPalette();
             renderSecretCode(false);
             renderCurrentGuess();
             renderGuesses();
+            hideFeedbackPanel();
             hideHint();
-            updateStatus('Make your guess! (' + config.numGuesses + ' attempts remaining)');
+            updateStatus(`Make your guess! (${config.numGuesses} attempts remaining)`);
             document.getElementById('hintBtn').disabled = false;
+            document.getElementById('submitBtn').disabled = true;
         }
 
-        function renderColorPalette() {
-            const palette = document.getElementById('colorPalette');
+        function renderSymbolPalette() {
+            const palette = document.getElementById('symbolPalette');
             palette.innerHTML = '';
 
-            for (let i = 0; i < config.numColors; i++) {
-                const colorDiv = document.createElement('div');
-                colorDiv.className = 'color-option';
-                colorDiv.style.backgroundColor = COLORS[i];
-                colorDiv.dataset.colorIndex = i;
-                colorDiv.title = COLOR_NAMES[i];
-                colorDiv.onclick = () => selectColor(i);
-                palette.appendChild(colorDiv);
+            for (let i = 0; i < config.numSymbols; i++) {
+                const symbolDiv = document.createElement('div');
+                symbolDiv.className = 'symbol-option';
+                symbolDiv.textContent = SYMBOLS[i].emoji;
+                symbolDiv.title = SYMBOLS[i].name;
+                symbolDiv.onclick = () => selectSymbol(i);
+                palette.appendChild(symbolDiv);
             }
         }
 
@@ -593,12 +839,22 @@
             const secretDiv = document.getElementById('secretCode');
             secretDiv.innerHTML = '';
 
+            if (!config.playMode && !revealed) {
+                for (let i = 0; i < config.numSlots; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'secret-slot';
+                    slot.textContent = '?';
+                    secretDiv.appendChild(slot);
+                }
+                return;
+            }
+
             for (let i = 0; i < config.numSlots; i++) {
                 const slot = document.createElement('div');
                 slot.className = 'secret-slot' + (revealed ? ' revealed' : '');
                 
-                if (revealed) {
-                    slot.style.backgroundColor = COLORS[gameState.secretCode[i]];
+                if (revealed && gameState.secretCode) {
+                    slot.textContent = SYMBOLS[gameState.secretCode[i]].emoji;
                 } else {
                     slot.textContent = '?';
                 }
@@ -618,18 +874,18 @@
                 
                 if (gameState.currentGuess[i] !== null) {
                     slot.classList.add('filled');
-                    slot.style.backgroundColor = COLORS[gameState.currentGuess[i]];
+                    slot.textContent = SYMBOLS[gameState.currentGuess[i]].emoji;
                 }
                 
-                if (i === gameState.activeSlot && !gameState.gameOver) {
+                if (i === gameState.activeSlot && !gameState.gameOver && !gameState.waitingForFeedback) {
                     slot.classList.add('active');
                 }
 
                 slot.onclick = () => {
-                    if (!gameState.gameOver) {
+                    if (!gameState.gameOver && !gameState.waitingForFeedback) {
                         gameState.activeSlot = i;
-                        if (gameState.selectedColor !== null) {
-                            gameState.currentGuess[i] = gameState.selectedColor;
+                        if (gameState.selectedSymbol !== null) {
+                            gameState.currentGuess[i] = gameState.selectedSymbol;
                         }
                         renderCurrentGuess();
                         updateSubmitButton();
@@ -640,16 +896,16 @@
             }
         }
 
-        function selectColor(colorIndex) {
-            if (gameState.gameOver) return;
+        function selectSymbol(symbolIndex) {
+            if (gameState.gameOver || gameState.waitingForFeedback) return;
 
-            gameState.selectedColor = colorIndex;
+            gameState.selectedSymbol = symbolIndex;
 
-            document.querySelectorAll('.color-option').forEach((el, i) => {
-                el.classList.toggle('selected', i === colorIndex);
+            document.querySelectorAll('.symbol-option').forEach((el, i) => {
+                el.classList.toggle('selected', i === symbolIndex);
             });
 
-            gameState.currentGuess[gameState.activeSlot] = colorIndex;
+            gameState.currentGuess[gameState.activeSlot] = symbolIndex;
             
             let nextSlot = (gameState.activeSlot + 1) % config.numSlots;
             for (let i = 0; i < config.numSlots; i++) {
@@ -667,16 +923,16 @@
 
         function updateSubmitButton() {
             const allFilled = gameState.currentGuess.every(c => c !== null);
-            document.getElementById('submitBtn').disabled = !allFilled || gameState.gameOver;
+            document.getElementById('submitBtn').disabled = !allFilled || gameState.gameOver || gameState.waitingForFeedback;
         }
 
         function clearGuess() {
-            if (gameState.gameOver) return;
+            if (gameState.gameOver || gameState.waitingForFeedback) return;
             gameState.currentGuess = new Array(config.numSlots).fill(null);
             gameState.activeSlot = 0;
-            gameState.selectedColor = null;
+            gameState.selectedSymbol = null;
             
-            document.querySelectorAll('.color-option').forEach(el => {
+            document.querySelectorAll('.symbol-option').forEach(el => {
                 el.classList.remove('selected');
             });
             
@@ -686,15 +942,15 @@
         }
 
         function calculateFeedback(guess, secret) {
-            let black = 0;
-            let white = 0;
+            let exact = 0;
+            let partial = 0;
             
             const secretCopy = [...secret];
             const guessCopy = [...guess];
 
             for (let i = 0; i < config.numSlots; i++) {
                 if (guessCopy[i] === secretCopy[i]) {
-                    black++;
+                    exact++;
                     secretCopy[i] = -1;
                     guessCopy[i] = -2;
                 }
@@ -704,52 +960,113 @@
                 if (guessCopy[i] >= 0) {
                     const index = secretCopy.indexOf(guessCopy[i]);
                     if (index !== -1) {
-                        white++;
+                        partial++;
                         secretCopy[index] = -1;
                     }
                 }
             }
 
-            return { black, white };
+            return { exact, partial };
         }
 
         function filterCodes(codes, guess, feedback) {
             return codes.filter(code => {
                 const fb = calculateFeedback(guess, code);
-                return fb.black === feedback.black && fb.white === feedback.white;
+                return fb.exact === feedback.exact && fb.partial === feedback.partial;
             });
         }
 
         function submitGuess() {
-            if (gameState.gameOver) return;
+            if (gameState.gameOver || gameState.waitingForFeedback) return;
             if (gameState.currentGuess.some(c => c === null)) return;
 
             const guess = [...gameState.currentGuess];
-            const feedback = calculateFeedback(guess, gameState.secretCode);
             
-            gameState.guesses.push({ guess, feedback });
+            if (config.playMode) {
+                const feedback = calculateFeedback(guess, gameState.secretCode);
+                processGuess(guess, feedback);
+            } else {
+                gameState.waitingForFeedback = true;
+                gameState.guesses.push({ guess, feedback: null });
+                renderGuesses();
+                showFeedbackPanel();
+                updateStatus('Enter feedback for this guess');
+                document.getElementById('submitBtn').disabled = true;
+                document.getElementById('exactPegs').max = config.numSlots;
+                document.getElementById('partialPegs').max = config.numSlots;
+                document.getElementById('exactPegs').value = 0;
+                document.getElementById('partialPegs').value = 0;
+            }
 
-            // Update possible codes for the solver
+            hideHint();
+        }
+
+        function showFeedbackPanel() {
+            document.getElementById('feedbackPanel').classList.add('active');
+        }
+
+        function hideFeedbackPanel() {
+            document.getElementById('feedbackPanel').classList.remove('active');
+        }
+
+        function submitFeedback() {
+            const exact = parseInt(document.getElementById('exactPegs').value) || 0;
+            const partial = parseInt(document.getElementById('partialPegs').value) || 0;
+
+            if (exact + partial > config.numSlots) {
+                alert(`Total pegs cannot exceed ${config.numSlots}`);
+                return;
+            }
+
+            const feedback = { exact, partial };
+            const guess = gameState.guesses[gameState.guesses.length - 1].guess;
+            
+            gameState.guesses[gameState.guesses.length - 1].feedback = feedback;
+            gameState.waitingForFeedback = false;
+            hideFeedbackPanel();
+            
+            processGuessResult(guess, feedback);
+        }
+
+        function processGuess(guess, feedback) {
+            gameState.guesses.push({ guess, feedback });
+            processGuessResult(guess, feedback);
+        }
+
+        function processGuessResult(guess, feedback) {
             gameState.possibleCodes = filterCodes(gameState.possibleCodes, guess, feedback);
 
             renderGuesses();
-            hideHint();
 
-            if (feedback.black === config.numSlots) {
+            if (feedback.exact === config.numSlots) {
                 gameState.gameOver = true;
                 gameState.won = true;
-                renderSecretCode(true);
-                updateStatus('🎉 Congratulations! You cracked the code!', 'win');
+                if (config.playMode) {
+                    renderSecretCode(true);
+                }
+                updateStatus('🎉 Code cracked!', 'win');
                 document.getElementById('hintBtn').disabled = true;
                 return;
             }
 
             if (gameState.guesses.length >= config.numGuesses) {
                 gameState.gameOver = true;
-                renderSecretCode(true);
-                updateStatus('😔 Game Over! The code is revealed above.', 'lose');
+                if (config.playMode) {
+                    renderSecretCode(true);
+                }
+                updateStatus('😔 Out of guesses!', 'lose');
                 document.getElementById('hintBtn').disabled = true;
                 return;
+            }
+
+            if (gameState.possibleCodes.length === 0 && !config.playMode) {
+                updateStatus('⚠️ No valid codes remain - check your feedback!');
+                gameState.possibleCodes = [...gameState.allCodes];
+                for (const g of gameState.guesses) {
+                    if (g.feedback) {
+                        gameState.possibleCodes = filterCodes(gameState.possibleCodes, g.guess, g.feedback);
+                    }
+                }
             }
 
             gameState.currentGuess = new Array(config.numSlots).fill(null);
@@ -758,19 +1075,17 @@
             updateSubmitButton();
             
             const remaining = config.numGuesses - gameState.guesses.length;
-            updateStatus(`Keep trying! (${remaining} attempt${remaining !== 1 ? 's' : ''} remaining)`);
+            const possibleMsg = !config.playMode ? ` | ${gameState.possibleCodes.length} possibilities` : '';
+            updateStatus(`${remaining} attempt${remaining !== 1 ? 's' : ''} remaining${possibleMsg}`);
         }
 
-        // ========== KNUTH'S ALGORITHM HINT SYSTEM ==========
-
         function getHint() {
-            if (gameState.gameOver) return;
+            if (gameState.gameOver || gameState.waitingForFeedback) return;
 
             const hintBtn = document.getElementById('hintBtn');
             hintBtn.disabled = true;
             hintBtn.textContent = '🧠 Thinking...';
 
-            // Use setTimeout to allow UI to update
             setTimeout(() => {
                 const bestGuess = findBestGuess();
                 applyHint(bestGuess);
@@ -782,22 +1097,18 @@
         function findBestGuess() {
             const possible = gameState.possibleCodes;
 
-            // If only one possibility, that's the answer
             if (possible.length === 1) {
                 return possible[0];
             }
 
-            // If two possibilities, just pick one
             if (possible.length === 2) {
                 return possible[0];
             }
 
-            // First guess optimization for standard settings
-            if (gameState.guesses.length === 0 && config.numSlots === 4 && config.numColors >= 4) {
-                return [0, 0, 1, 1]; // Classic optimal first guess
+            if (gameState.guesses.length === 0 && config.numSlots === 4 && config.numSymbols >= 4) {
+                return [0, 0, 1, 1];
             }
 
-            // For small remaining sets, just pick first
             if (possible.length <= 2) {
                 return possible[0];
             }
@@ -805,18 +1116,12 @@
             let bestGuess = null;
             let bestScore = Infinity;
 
-            // Determine which codes to consider as guesses
-            // For efficiency, prioritize codes that are still possible
             let candidates = possible;
-            
-            // If too many candidates, sample
             if (candidates.length > 50) {
                 candidates = possible.slice(0, 50);
             }
 
-            // Also consider some codes outside possible set for better minimax
             if (possible.length > 10 && gameState.allCodes.length <= 1296) {
-                // Add some strategic guesses from all codes
                 const extra = gameState.allCodes
                     .filter(c => !possible.some(p => arraysEqual(p, c)))
                     .slice(0, 20);
@@ -828,14 +1133,11 @@
                 
                 for (const code of possible) {
                     const fb = calculateFeedback(guess, code);
-                    const key = `${fb.black},${fb.white}`;
+                    const key = `${fb.exact},${fb.partial}`;
                     feedbackCounts[key] = (feedbackCounts[key] || 0) + 1;
                 }
 
-                // Minimax: minimize the maximum remaining possibilities
                 const worstCase = Math.max(...Object.values(feedbackCounts));
-
-                // Prefer guesses that are still possible (could be the answer)
                 const isPossible = possible.some(p => arraysEqual(p, guess));
                 const score = worstCase * 1000 + (isPossible ? 0 : 1);
 
@@ -857,12 +1159,10 @@
         }
 
         function applyHint(guess) {
-            // Fill in the current guess with the hint
             gameState.currentGuess = [...guess];
             renderCurrentGuess();
             updateSubmitButton();
 
-            // Animate the slots
             const slots = document.querySelectorAll('.guess-slot');
             slots.forEach((slot, i) => {
                 setTimeout(() => {
@@ -871,7 +1171,6 @@
                 }, i * 100);
             });
 
-            // Show hint info
             showHintInfo(guess);
         }
 
@@ -879,12 +1178,12 @@
             const hintInfo = document.getElementById('hintInfo');
             const hintStats = document.getElementById('hintStats');
             
-            const colorNames = guess.map(c => COLOR_NAMES[c]).join(', ');
+            const symbolNames = guess.map(s => SYMBOLS[s].name).join(', ');
             const possibleCount = gameState.possibleCodes.length;
             
-            let message = `Suggested: ${colorNames}`;
+            let message = `Suggested: ${symbolNames}`;
             if (possibleCount > 1) {
-                message += ` | ${possibleCount.toLocaleString()} possible codes remain`;
+                message += ` | ${possibleCount.toLocaleString()} possible codes`;
             } else if (possibleCount === 1) {
                 message += ` | This must be the answer!`;
             }
@@ -896,8 +1195,6 @@
         function hideHint() {
             document.getElementById('hintInfo').classList.remove('active');
         }
-
-        // ========== END HINT SYSTEM ==========
 
         function renderGuesses() {
             const guessesDiv = document.getElementById('guesses');
@@ -914,35 +1211,39 @@
                 rowNum.textContent = i + 1;
                 row.appendChild(rowNum);
 
-                const colorsDiv = document.createElement('div');
-                colorsDiv.className = 'guess-colors';
+                const symbolsDiv = document.createElement('div');
+                symbolsDiv.className = 'guess-symbols';
                 
-                for (const colorIndex of guess) {
-                    const colorDiv = document.createElement('div');
-                    colorDiv.className = 'guess-color';
-                    colorDiv.style.backgroundColor = COLORS[colorIndex];
-                    colorsDiv.appendChild(colorDiv);
+                for (const symbolIndex of guess) {
+                    const symbolDiv = document.createElement('div');
+                    symbolDiv.className = 'guess-symbol';
+                    symbolDiv.textContent = SYMBOLS[symbolIndex].emoji;
+                    symbolsDiv.appendChild(symbolDiv);
                 }
-                row.appendChild(colorsDiv);
+                row.appendChild(symbolsDiv);
 
                 const feedbackDiv = document.createElement('div');
                 feedbackDiv.className = 'feedback';
                 
-                for (let j = 0; j < feedback.black; j++) {
-                    const peg = document.createElement('div');
-                    peg.className = 'peg black';
-                    feedbackDiv.appendChild(peg);
-                }
-                for (let j = 0; j < feedback.white; j++) {
-                    const peg = document.createElement('div');
-                    peg.className = 'peg white';
-                    feedbackDiv.appendChild(peg);
-                }
-                const emptyPegs = config.numSlots - feedback.black - feedback.white;
-                for (let j = 0; j < emptyPegs; j++) {
-                    const peg = document.createElement('div');
-                    peg.className = 'peg empty';
-                    feedbackDiv.appendChild(peg);
+                if (feedback) {
+                    for (let j = 0; j < feedback.exact; j++) {
+                        const peg = document.createElement('div');
+                        peg.className = 'peg exact';
+                        feedbackDiv.appendChild(peg);
+                    }
+                    for (let j = 0; j < feedback.partial; j++) {
+                        const peg = document.createElement('div');
+                        peg.className = 'peg partial';
+                        feedbackDiv.appendChild(peg);
+                    }
+                    const emptyPegs = config.numSlots - feedback.exact - feedback.partial;
+                    for (let j = 0; j < emptyPegs; j++) {
+                        const peg = document.createElement('div');
+                        peg.className = 'peg empty';
+                        feedbackDiv.appendChild(peg);
+                    }
+                } else {
+                    feedbackDiv.innerHTML = '<span style="opacity: 0.5; font-size: 0.8rem;">awaiting...</span>';
                 }
                 
                 row.appendChild(feedbackDiv);
@@ -954,11 +1255,6 @@
             const status = document.getElementById('status');
             status.textContent = message;
             status.className = 'status ' + type;
-        }
-
-        function newGame() {
-            document.getElementById('settings').style.display = 'block';
-            document.getElementById('gameArea').classList.remove('active');
         }
     </script>
 </body>
