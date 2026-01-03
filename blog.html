@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Blog</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #fafafa;
+            --card: #ffffff;
+            --text: #333333;
+            --text-muted: #666666;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --border: #e5e7eb;
+            --danger: #dc2626;
+        }
+
+        .dark {
+            --bg: #111827;
+            --card: #1f2937;
+            --text: #f9fafb;
+            --text-muted: #9ca3af;
+            --accent: #3b82f6;
+            --accent-hover: #60a5fa;
+            --border: #374151;
+            --danger: #ef4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        header {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+            cursor: pointer;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        .btn-secondary:hover {
+            background: var(--text-muted);
+            color: var(--card);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-icon {
+            padding: 0.5rem;
+            background: transparent;
+            font-size: 1.2rem;
+        }
+
+        main {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        .post {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .post:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .post-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .post-title:hover {
+            color: var(--accent);
+        }
+
+        .post-meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .post-tag {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 0.2rem 0.6rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            margin-right: 0.5rem;
+        }
+
+        .post-excerpt {
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .post-content {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .post-content h1, .post-content h2, .post-content h3 {
+            margin: 1.5rem 0 0.5rem 0;
+        }
+
+        .post-content p {
+            margin-bottom: 1rem;
+        }
+
+        .post-content code {
+            background: var(--border);
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+        }
+
+        .post-content pre {
+            background: var(--border);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        .post-content blockquote {
+            border-left: 4px solid var(--accent);
+            padding-left: 1rem;
+            margin: 1rem 0;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .post-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Editor Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--card);
+            border-radius: 1rem;
+            width: 100%;
+            max-width: 700px;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 1.25rem;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-family: inherit;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .form-group textarea {
+            min-height: 300px;
+            resize: vertical;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+        }
+
+        /* Single Post View */
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--accent);
+            cursor: pointer;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+
+        .back-btn:hover {
+            text-decoration: underline;
+        }
+
+        .full-post .post-title {
+            font-size: 2rem;
+            cursor: default;
+        }
+
+        .full-post .post-title:hover {
+            color: var(--text);
+        }
+
+        /* Search */
+        .search-bar {
+            margin-bottom: 2rem;
+        }
+
+        .search-bar input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            background: var(--card);
+            color: var(--text);
+        }
+
+        .search-bar input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state h2 {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Stats */
+        .stats {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 2rem;
+            color: var(--text-muted);
+        }
+
+        /* Markdown Help */
+        .markdown-help {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        /* Export/Import */
+        .data-actions {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        #importFile {
+            display: none;
+        }
+
+        @media (max-width: 600px) {
+            .post-header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="logo" onclick="showAllPosts()">📝 My Blog</div>
+            <div class="header-actions">
+                <button class="btn-icon" onclick="toggleDarkMode()" title="Toggle dark mode">🌓</button>
+                <button class="btn-primary" onclick="openEditor()">+ New Post</button>
+            </div>
+        </div>
+    </header>
+
+    <main id="app">
+        <!-- Content rendered by JavaScript -->
+    </main>
+
+    <!-- Editor Modal -->
+    <div class="modal-overlay" id="editorModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="editorTitle">New Post</h2>
+                <button class="btn-icon" onclick="closeEditor()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="postTitle">Title</label>
+                    <input type="text" id="postTitle" placeholder="Enter post title...">
+                </div>
+                <div class="form-group">
+                    <label for="postTags">Tags (comma-separated)</label>
+                    <input type="text" id="postTags" placeholder="tech, life, thoughts">
+                </div>
+                <div class="form-group">
+                    <label for="postContent">Content</label>
+                    <textarea id="postContent" placeholder="Write your post here... 
+
+Supports basic Markdown:
+**bold**, *italic*, `code`
+# Heading 1
+## Heading 2
+> Blockquote
+- List item"></textarea>
+                    <div class="markdown-help">
+                        Supports: **bold**, *italic*, `code`, # headings, > quotes, - lists
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeEditor()">Cancel</button>
+                <button class="btn-primary" onclick="savePost()">Publish</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let posts = [];
+        let currentView = 'list';
+        let currentPostId = null;
+        let editingPostId = null;
+        let searchQuery = '';
+
+        // Initialize
+        function init() {
+            loadPosts();
+            loadDarkMode();
+            render();
+        }
+
+        // LocalStorage
+        function loadPosts() {
+            const saved = localStorage.getItem('blog_posts');
+            posts = saved ? JSON.parse(saved) : [];
+        }
+
+        function savePosts() {
+            localStorage.setItem('blog_posts', JSON.stringify(posts));
+        }
+
+        function loadDarkMode() {
+            const dark = localStorage.getItem('blog_dark') === 'true';
+            if (dark) document.body.classList.add('dark');
+        }
+
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark');
+            localStorage.setItem('blog_dark', document.body.classList.contains('dark'));
+        }
+
+        // Simple Markdown Parser
+        function parseMarkdown(text) {
+            return text
+                // Escape HTML
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                // Code blocks
+                .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+                // Inline code
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                // Bold
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                // Italic
+                .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+                // Headings
+                .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+                // Blockquotes
+                .replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>')
+                // Lists
+                .replace(/^- (.+)$/gm, '<li>$1</li>')
+                // Links
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+                // Line breaks
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+        }
+
+        // Render
+        function render() {
+            const app = document.getElementById('app');
+            
+            if (currentView === 'single' && currentPostId) {
+                renderSinglePost(app);
+            } else {
+                renderPostList(app);
+            }
+        }
+
+        function renderPostList(container) {
+            const filteredPosts = posts.filter(post => {
+                if (!searchQuery) return true;
+                const query = searchQuery.toLowerCase();
+                return post.title.toLowerCase().includes(query) ||
+                       post.content.toLowerCase().includes(query) ||
+                       post.tags.some(t => t.toLowerCase().includes(query));
+            }).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            let html = `
+                <div class="search-bar">
+                    <input type="text" placeholder="Search posts..." 
+                           value="${searchQuery}" 
+                           oninput="handleSearch(this.value)">
+                </div>
+                <div class="stats">
+                    <span>📚 ${posts.length} posts</span>
+                    <span>🏷️ ${getUniqueTags().length} tags</span>
+                </div>
+            `;
+
+            if (filteredPosts.length === 0) {
+                html += `
+                    <div class="empty-state">
+                        <h2>${searchQuery ? 'No posts found' : 'No posts yet'}</h2>
+                        <p>${searchQuery ? 'Try a different search term' : 'Click "+ New Post" to create your first post!'}</p>
+                    </div>
+                `;
+            } else {
+                filteredPosts.forEach(post => {
+                    const excerpt = post.content.substring(0, 200) + (post.content.length > 200 ? '...' : '');
+                    const date = new Date(post.date).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+
+                    html += `
+                        <article class="post">
+                            <div class="post-header">
+                                <h2 class="post-title" onclick="viewPost('${post.id}')">${escapeHtml(post.title)}</h2>
+                                <div class="post-actions">
+                                    <button class="btn-secondary" onclick="openEditor('${post.id}')">Edit</button>
+                                    <button class="btn-danger" onclick="deletePost('${post.id}')">Delete</button>
+                                </div>
+                            </div>
+                            <div class="post-meta">
+                                📅 ${date}
+                                ${post.tags.length ? ' • ' + post.tags.map(t => `<span class="post-tag">${escapeHtml(t)}</span>`).join('') : ''}
+                            </div>
+                            <div class="post-excerpt">${escapeHtml(excerpt)}</div>
+                        </article>
+                    `;
+                });
+            }
+
+            html += `
+                <div class="data-actions">
+                    <button class="btn-secondary" onclick="exportPosts()">📤 Export</button>
+                    <button class="btn-secondary" onclick="document.getElementById('importFile').click()">📥 Import</button>
+                    <input type="file" id="importFile" accept=".json" onchange="importPosts(event)">
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        function renderSinglePost(container) {
+            const post = posts.find(p => p.id === currentPostId);
+            if (!post) {
+                showAllPosts();
+                return;
+            }
+
+            const date = new Date(post.date).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            container.innerHTML = `
+                <div class="back-btn" onclick="showAllPosts()">← Back to all posts</div>
+                <article class="post full-post">
+                    <div class="post-header">
+                        <h1 class="post-title">${escapeHtml(post.title)}</h1>
+                        <div class="post-actions">
+                            <button class="btn-secondary" onclick="openEditor('${post.id}')">Edit</button>
+                            <button class="btn-danger" onclick="deletePost('${post.id}')">Delete</button>
+                        </div>
+                    </div>
+                    <div class="post-meta">
+                        📅 ${date}
+                        ${post.tags.length ? ' • ' + post.tags.map(t => `<span class="post-tag">${escapeHtml(t)}</span>`).join('') : ''}
+                    </div>
+                    <div class="post-content">${parseMarkdown(post.content)}</div>
+                </article>
+            `;
+        }
+
+        // Utility
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        function getUniqueTags() {
+            const tags = new Set();
+            posts.forEach(p => p.tags.forEach(t => tags.add(t)));
+            return Array.from(tags);
+        }
+
+        // Actions
+        function showAllPosts() {
+            currentView = 'list';
+            currentPostId = null;
+            render();
+        }
+
+        function viewPost(id) {
+            currentView = 'single';
+            currentPostId = id;
+            render();
+            window.scrollTo(0, 0);
+        }
+
+        function handleSearch(query) {
+            searchQuery = query;
+            render();
+        }
+
+        function openEditor(postId = null) {
+            editingPostId = postId;
+            const modal = document.getElementById('editorModal');
+            const titleEl = document.getElementById('editorTitle');
+            const postTitleEl = document.getElementById('postTitle');
+            const postTagsEl = document.getElementById('postTags');
+            const postContentEl = document.getElementById('postContent');
+
+            if (postId) {
+                const post = posts.find(p => p.id === postId);
+                if (post) {
+                    titleEl.textContent = 'Edit Post';
+                    postTitleEl.value = post.title;
+                    postTagsEl.value = post.tags.join(', ');
+                    postContentEl.value = post.content;
+                }
+            } else {
+                titleEl.textContent = 'New Post';
+                postTitleEl.value = '';
+                postTagsEl.value = '';
+                postContentEl.value = '';
+            }
+
+            modal.classList.add('active');
+            postTitleEl.focus();
+        }
+
+        function closeEditor() {
+            document.getElementById('editorModal').classList.remove('active');
+            editingPostId = null;
+        }
+
+        function savePost() {
+            const title = document.getElementById('postTitle').value.trim();
+            const tags = document.getElementById('postTags').value
+                .split(',')
+                .map(t => t.trim())
+                .filter(t => t);
+            const content = document.getElementById('postContent').value.trim();
+
+            if (!title || !content) {
+                alert('Please enter a title and content');
+                return;
+            }
+
+            if (editingPostId) {
+                const post = posts.find(p => p.id === editingPostId);
+                if (post) {
+                    post.title = title;
+                    post.tags = tags;
+                    post.content = content;
+                    post.updated = new Date().toISOString();
+                }
+            } else {
+                posts.push({
+                    id: generateId(),
+                    title,
+                    tags,
+                    content,
+                    date: new Date().toISOString()
+                });
+            }
+
+            savePosts();
+            closeEditor();
+            render();
+        }
+
+        function deletePost(id) {
+            if (!confirm('Are you sure you want to delete this post?')) return;
+            
+            posts = posts.filter(p => p.id !== id);
+            savePosts();
+            
+            if (currentPostId === id) {
+                showAllPosts();
+            } else {
+                render();
+            }
+        }
+
+        // Import/Export
+        function exportPosts() {
+            const data = JSON.stringify(posts, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `blog-backup-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importPosts(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (Array.isArray(imported)) {
+                        if (confirm(`Import ${imported.length} posts? This will add to your existing posts.`)) {
+                            posts = [...posts, ...imported];
+                            savePosts();
+                            render();
+                        }
+                    }
+                } catch (err) {
+                    alert('Invalid file format');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeEditor();
+            }
+            if (e.ctrlKey && e.key === 'n') {
+                e.preventDefault();
+                openEditor();
+            }
+        });
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>
