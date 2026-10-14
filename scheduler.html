@@ -109,6 +109,7 @@ html.lock, html.lock body { overflow: hidden; }
 .note.dragging { cursor: grabbing; }
 .note.dragging .bubble { transform: scale(1.015); }
 .wrap.has-edit .note:not(.editing) { opacity: .4; }
+.note.holding .bubble { background: var(--surface-2); border-color: var(--accent); }
 
 .grip {
   display: none; position: absolute; right: 64px; z-index: 8;
@@ -167,6 +168,7 @@ html.lock, html.lock body { overflow: hidden; }
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+.editor.ghost { pointer-events: none; }
 .edbar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; }
 .iconbtn {
   min-width: 44px; height: 44px; padding: 0 8px;
@@ -235,6 +237,7 @@ html.lock, html.lock body { overflow: hidden; }
   var editId = null;          // note in move/resize mode
   var openId = null;          // note open in the text page
   var drag = null, pending = null, lastClientY = 0, raf = 0, suppressUntil = 0;
+  var freshId = null, longFired = false;
 
   /* ---------- time helpers ---------- */
   function pad(x) { return x < 10 ? '0' + x : '' + x; }
@@ -391,7 +394,7 @@ html.lock, html.lock body { overflow: hidden; }
       if (oe <= n.s) minS = Math.max(minS, oe);
       if (o.s >= e0) maxE = Math.min(maxE, o.s);
     });
-    drag = { id: n.id, type: type, pid: pid, startY: y + window.scrollY, s0: n.s, n0: n.n, minS: minS, maxE: maxE, others: others, moved: false };
+    drag = { id: n.id, type: type, pid: pid, startY: y + window.scrollY, s0: n.s, n0: n.n, minS: minS, maxE: maxE, others: others, moved: false, y0: y, travelled: false };
     lastClientY = y;
     try { el.setPointerCapture(pid); } catch (e) {}
     el.classList.add('dragging');
@@ -434,47 +437,97 @@ html.lock, html.lock body { overflow: hidden; }
     var el = els.get(d.id);
     if (el) el.classList.remove('dragging');
     if (d.moved) persist(d.id);
+    return d;
   }
   function cancelPending() {
     if (pending) { clearTimeout(pending.timer); pending = null; }
   }
 
+  var holdOpen = null, noMenuUntil = 0;
+  function startHold(e, info) {
+    cancelPending();
+    info.x = e.clientX; info.y = e.clientY; info.pid = e.pointerId;
+    info.timer = setTimeout(function () {
+      var p = pending; pending = null;
+      if (!p || editId || openId) return;
+      var id = p.id, fresh = false;
+      if (p.kind === 'create') {
+        var taken = false;
+        notes.forEach(function (o) { if (p.slot >= o.s && p.slot < o.s + o.n) taken = true; });
+        if (taken) return;
+        var nn = { id: newId(), s: p.slot, n: 1, t: '' };
+        notes.set(nn.id, nn);
+        renderAll();
+        persist(nn.id);
+        id = nn.id; fresh = true;
+      } else if (!notes.get(id)) {
+        return;
+      }
+      // The text page opens when the finger lifts, never under a held finger.
+      longFired = true;
+      holdOpen = { id: id, pid: p.pid, fresh: fresh };
+      var hel = els.get(id);
+      if (hel) hel.classList.add('holding');
+      try { if (navigator.vibrate) navigator.vibrate(14); } catch (er) {}
+    }, 450);
+    pending = info;
+  }
+
   grid.addEventListener('pointerdown', function (e) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    longFired = false;
     var el = e.target.closest('.note');
-    if (!el) return;
-    var n = notes.get(el.dataset.id);
-    if (!n) return;
-    if (editId) {
-      if (editId !== n.id) return; // the click that follows ends the mode
-      if (e.target.closest('.kill')) return;
-      disarmKill();
-      var g = e.target.closest('.grip');
-      beginDrag(e.clientY, e.pointerId, n, el, g ? g.dataset.handle : 'move');
-      e.preventDefault();
+    if (el) {
+      var n = notes.get(el.dataset.id);
+      if (!n) return;
+      if (editId) {
+        if (editId !== n.id) return; // the click that follows ends edit mode
+        if (e.target.closest('.kill')) return;
+        disarmKill();
+        var g = e.target.closest('.grip');
+        beginDrag(e.clientY, e.pointerId, n, el, g ? g.dataset.handle : 'move');
+        e.preventDefault();
+        return;
+      }
+      startHold(e, { kind: 'open', id: n.id });
       return;
     }
-    cancelPending();
-    pending = {
-      id: n.id, x: e.clientX, y: e.clientY, ly: e.clientY, pid: e.pointerId, el: el,
-      timer: setTimeout(function () {
-        var p = pending; pending = null;
-        if (!p || !notes.get(p.id)) return;
-        enterEdit(p.id);
-        beginDrag(p.ly, p.pid, notes.get(p.id), p.el, 'move');
-      }, 450)
-    };
+    if (editId || openId) return;
+    var gr = grid.getBoundingClientRect();
+    if (e.clientX < gr.left) return;
+    var slot = Math.floor((e.clientY - gr.top) / H);
+    if (slot < 0 || slot >= SLOTS) return;
+    startHold(e, { kind: 'create', slot: slot });
   });
   window.addEventListener('pointermove', function (e) {
-    if (drag && e.pointerId === drag.pid) { lastClientY = e.clientY; return; }
+    if (drag && e.pointerId === drag.pid) {
+      lastClientY = e.clientY;
+      if (Math.abs(e.clientY - drag.y0) > 8) drag.travelled = true;
+      return;
+    }
     if (pending && e.pointerId === pending.pid) {
-      pending.ly = e.clientY;
       if (Math.hypot(e.clientX - pending.x, e.clientY - pending.y) > 10) cancelPending();
     }
   });
   function onUp(e) {
-    if (drag && e.pointerId === drag.pid) { endDrag(); suppressUntil = Date.now() + 400; }
+    if (drag && e.pointerId === drag.pid) {
+      var d = endDrag();
+      // a real drag, or any press on a resize handle, must not also count as a tap
+      if (d && (d.travelled || d.moved || d.type !== 'move')) suppressUntil = Date.now() + 400;
+    }
     if (pending && e.pointerId === pending.pid) cancelPending();
+    if (holdOpen && e.pointerId === holdOpen.pid) {
+      var h = holdOpen; holdOpen = null;
+      var hel = els.get(h.id);
+      if (hel) hel.classList.remove('holding');
+      if (e.type === 'pointercancel') {
+        // the browser took the gesture over (a scroll started): drop a note that was only just made
+        if (h.fresh) { notes.delete(h.id); renderAll(); persist(h.id); }
+      } else {
+        if (h.fresh) freshId = h.id;
+        openEditor(h.id, true);
+      }
+    }
   }
   window.addEventListener('pointerup', onUp);
   window.addEventListener('pointercancel', onUp);
@@ -485,6 +538,7 @@ html.lock, html.lock body { overflow: hidden; }
   function newId() { return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
   sched.addEventListener('click', function (e) {
     if (Date.now() < suppressUntil) return;
+    if (longFired) { longFired = false; return; }
     var kill = e.target.closest('.kill');
     if (kill) {
       var kel = kill.closest('.note'), kid = kel && kel.dataset.id;
@@ -502,35 +556,50 @@ html.lock, html.lock body { overflow: hidden; }
       }
       return;
     }
-    if (editId) { exitEdit(); return; }
+    var noteEl = e.target.closest('.note');
+    if (editId) {
+      // tap the note that is in edit mode: open its text page. Tap anywhere else: end edit mode.
+      if (noteEl && noteEl.dataset.id === editId) { var oid = editId; exitEdit(); openEditor(oid); return; }
+      exitEdit();
+      return;
+    }
     var gr = grid.getBoundingClientRect();
     if (e.clientX < gr.left) return;
-    var noteEl = e.target.closest('.note');
-    if (noteEl) { openEditor(noteEl.dataset.id); return; }
+    if (noteEl) { enterEdit(noteEl.dataset.id); return; }
     var slot = Math.floor((e.clientY - gr.top) / H);
     if (slot < 0 || slot >= SLOTS) return;
     var n = { id: newId(), s: slot, n: 1, t: '' };
     notes.set(n.id, n);
     renderAll();
-    openEditor(n.id);
+    persist(n.id);
+    enterEdit(n.id);
   });
   grid.addEventListener('keydown', function (e) {
-    if (e.key !== 'Enter') return;
+    if (e.key !== 'Enter' || e.target.closest('.kill')) return;
     var el = e.target.closest('.note');
-    if (el && !editId) openEditor(el.dataset.id);
+    if (!el) return;
+    if (editId === el.dataset.id) { exitEdit(); openEditor(el.dataset.id); }
+    else if (!editId) enterEdit(el.dataset.id);
   });
 
   /* ---------- text page ---------- */
-  function openEditor(id) {
+  function openEditor(id, viaHold) {
     var n = notes.get(id);
     if (!n) return;
     openId = id;
     ta.value = n.t;
     edTime.textContent = rangeLabel(n);
     editor.hidden = false;
+    if (viaHold) {
+      // swallow the release click and any long-press menu from the finger that just lifted
+      noMenuUntil = Date.now() + 900;
+      editor.classList.add('ghost');
+      setTimeout(function () { editor.classList.remove('ghost'); }, 350);
+    }
     root.classList.add('lock');
     nowBtn.hidden = true;
     syncViewport();
+    try { ta.focus({ preventScroll: true }); } catch (er) {}
     requestAnimationFrame(function () {
       ta.focus();
       ta.setSelectionRange(ta.value.length, ta.value.length);
@@ -541,8 +610,9 @@ html.lock, html.lock body { overflow: hidden; }
     var id = openId, n = notes.get(id);
     if (n) {
       n.t = ta.value;
-      if (remove || !n.t.trim()) notes.delete(id);
+      if (id === freshId && !n.t.trim()) notes.delete(id);
     }
+    freshId = null;
     openId = null;
     editor.hidden = true;
     root.classList.remove('lock');
@@ -559,6 +629,7 @@ html.lock, html.lock body { overflow: hidden; }
     persist(openId, 600);
   });
   backBtn.addEventListener('click', function () { closeEditor(false); });
+  editor.addEventListener('contextmenu', function (e) { if (Date.now() < noMenuUntil) e.preventDefault(); });
   window.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
       if (openId) closeEditor(false); else exitEdit();
