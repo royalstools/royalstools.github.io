@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slow Tide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Figtree:wght@400;500;600&display=swap">
+<style>
+/* Layout: one calm column. Orb stage on top, breath-shape preview, presets, sliders, start. Dark-first, sea-glass accent with a warm amber for holds. */
+:root {
+  --bg: #0a1416;
+  --surface: #11222580;
+  --surface-solid: #112225;
+  --line: #1f3a3f;
+  --fg: #e7f0ee;
+  --muted: #8fa9a9;
+  --accent: #7fd6c2;
+  --accent-ink: #062320;
+  --warm: #f0c48f;
+  --orb-core: #bff5e8;
+  --orb-edge: #2c8f86;
+  --glow: rgba(127, 214, 194, 0.35);
+  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #eaf2f0;
+    --surface: #ffffffb3;
+    --surface-solid: #ffffff;
+    --line: #c5d9d6;
+    --fg: #10282a;
+    --muted: #506b6c;
+    --accent: #17766a;
+    --accent-ink: #f2fbf9;
+    --warm: #a8681f;
+    --orb-core: #d9fbf2;
+    --orb-edge: #4fb5a8;
+    --glow: rgba(47, 160, 146, 0.30);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #eaf2f0;
+  --surface: #ffffffb3;
+  --surface-solid: #ffffff;
+  --line: #c5d9d6;
+  --fg: #10282a;
+  --muted: #506b6c;
+  --accent: #17766a;
+  --accent-ink: #f2fbf9;
+  --warm: #a8681f;
+  --orb-core: #d9fbf2;
+  --orb-edge: #4fb5a8;
+  --glow: rgba(47, 160, 146, 0.30);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { color-scheme: dark; }
+}
+:root[data-theme="dark"] { color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  padding-inline: 20px;
+  padding-block: 28px 40px;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap { max-width: 480px; margin-inline: auto; display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: 1.9rem; letter-spacing: 0.01em; margin: 0; }
+.today { font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+
+/* Stage */
+.stage { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.orb-box { position: relative; width: min(78vw, 320px); aspect-ratio: 1; max-width: 100%; display: grid; place-items: center; }
+.glow, .orb, .ring { position: absolute; inset: 0; }
+.glow { border-radius: 50%; background: radial-gradient(closest-side, var(--glow), transparent 72%); filter: blur(8px); transform: scale(1.15); opacity: .55; }
+.orb-wrap { position: absolute; inset: 12%; display: grid; place-items: center; will-change: transform; transform: scale(.5); }
+.orb {
+  inset: 0; border-radius: 50%;
+  background:
+    radial-gradient(circle at 36% 30%, var(--orb-core) 0%, transparent 46%),
+    radial-gradient(circle at 50% 55%, var(--orb-edge) 0%, color-mix(in srgb, var(--orb-edge) 40%, var(--bg)) 100%);
+  box-shadow: 0 0 60px 6px var(--glow), inset 0 -14px 40px color-mix(in srgb, var(--bg) 35%, transparent);
+  transition: filter 1.2s ease;
+}
+.orb.hold { filter: hue-rotate(-62deg) saturate(1.05); }
+.ring { inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 1.4; }
+.ring .track { stroke: var(--line); }
+.ring .prog { stroke: var(--accent); stroke-linecap: round; transition: stroke .6s; }
+.ring .prog.hold { stroke: var(--warm); }
+.count {
+  position: relative; z-index: 2; font-family: var(--font-display); font-size: clamp(3rem, 16vw, 4.4rem);
+  line-height: 1; color: var(--accent-ink); font-variant-numeric: tabular-nums; text-shadow: 0 1px 18px rgba(0,0,0,.12);
+  min-width: 1ch; text-align: center;
+}
+.orb-box.idle .glow { animation: ambient 7s ease-in-out infinite; }
+@keyframes ambient { 0%,100% { opacity: .4; } 50% { opacity: .75; } }
+
+.phase { font-family: var(--font-display); font-size: 2.3rem; line-height: 1.1; text-align: center; min-height: 1.1em; margin: 0; }
+.phase-sub { color: var(--muted); font-size: .92rem; text-align: center; margin: -10px 0 0; min-height: 1.4em; font-variant-numeric: tabular-nums; }
+
+/* Breath counter */
+.counter { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; min-width: 0; }
+.counter-num { font-variant-numeric: tabular-nums; font-size: .9rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.counter-num b { color: var(--fg); font-weight: 600; font-size: 1.15rem; letter-spacing: 0; }
+.dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; max-width: 100%; }
+.dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--line); background: transparent; transition: background .5s, border-color .5s, transform .5s; }
+.dot.on { background: var(--accent); border-color: var(--accent); }
+.dot.now { border-color: var(--accent); transform: scale(1.25); }
+
+/* Shape preview */
+.shape { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px 10px; }
+.shape svg { display: block; width: 100%; height: 54px; overflow: visible; }
+.shape .path { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.shape .fillp { fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: none; }
+.shape .hl { stroke: var(--warm); }
+.shape-meta { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .8rem; margin-top: 8px; font-variant-numeric: tabular-nums; }
+
+/* Presets */
+.section-label { font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; display: flex; justify-content: space-between; gap: 10px; }
+.presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.preset {
+  font: inherit; color: inherit; text-align: left; cursor: pointer; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  transition: border-color .2s, background .2s;
+}
+.preset:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.preset[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--surface-solid)); }
+.preset .p-name { font-weight: 600; font-size: 1rem; font-variant-numeric: tabular-nums; }
+.preset .p-sub { font-size: .8rem; color: var(--muted); }
+.tag { align-self: flex-start; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 2px; }
+.tag.spacer { visibility: hidden; }
+.desc { color: var(--muted); font-size: .9rem; margin: 12px 2px 0; min-height: 2.8em; text-wrap: pretty; }
+
+/* Sliders */
+.sliders { display: flex; flex-direction: column; gap: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px 16px; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: baseline; }
+.row label { font-weight: 500; font-size: .95rem; }
+.row .val { font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; min-width: 3.4ch; text-align: right; }
+.row input { grid-column: 1 / -1; }
+.sliders.locked { opacity: .5; pointer-events: none; }
+.rounds-row { padding-top: 16px; border-top: 1px solid var(--line); }
+
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: transparent; margin: 0; cursor: pointer; }
+input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--line) var(--fill, 0%)); }
+input[type=range]::-moz-range-track { height: 4px; border-radius: 4px; background: var(--line); }
+input[type=range]::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--accent); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg); box-shadow: 0 0 0 1px var(--accent); margin-top: -9px; }
+input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg); box-shadow: 0 0 0 1px var(--accent); }
+input[type=range]:focus-visible { outline: none; }
+input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent); }
+input[type=range]:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent); }
+
+.endless { display: flex; align-items: center; gap: 10px; font-size: .9rem; color: var(--muted); cursor: pointer; margin-top: 2px; }
+.endless input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+
+/* Actions */
+.actions { display: flex; gap: 10px; }
+.btn {
+  font: inherit; font-weight: 600; font-size: 1.05rem; cursor: pointer; border-radius: 999px; padding: 15px 22px; border: 1px solid var(--accent);
+  background: var(--accent); color: var(--accent-ink); flex: 1; transition: transform .15s, background .2s;
+}
+.btn:active { transform: scale(.98); }
+.btn.ghost { background: transparent; color: var(--fg); border-color: var(--line); }
+button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; }
+.foot { color: var(--muted); font-size: .8rem; text-align: center; margin: 0; text-wrap: balance; }
+
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  .orb-box.idle .glow { animation: none; }
+  .dot, .orb, .preset, .btn { transition: none; }
+}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Slow Tide</h1>
+    <span class="today" id="today"></span>
+  </header>
+
+  <section class="stage" aria-label="Breathing guide">
+    <div class="orb-box idle" id="orbBox">
+      <div class="glow" id="glow"></div>
+      <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="track" cx="50" cy="50" r="48.6"></circle>
+        <circle class="prog" id="prog" cx="50" cy="50" r="48.6" stroke-dasharray="305.4" stroke-dashoffset="305.4"></circle>
+      </svg>
+      <div class="orb-wrap" id="orbWrap">
+        <div class="orb" id="orb"></div>
+        <div class="count" id="count">4</div>
+      </div>
+    </div>
+    <p class="phase" id="phase" aria-live="polite">Ready</p>
+    <p class="phase-sub" id="phaseSub">Settle in and press begin</p>
+
+    <div class="counter">
+      <div class="counter-num" id="counterNum"></div>
+      <div class="dots" id="dots" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button class="btn" id="startBtn" type="button">Begin</button>
+  </div>
+
+  <section>
+    <p class="section-label"><span>Pattern</span><span id="customTag"></span></p>
+    <div class="presets" id="presets"></div>
+    <p class="desc" id="desc"></p>
+  </section>
+
+  <section class="shape" aria-label="One breath">
+    <svg id="shapeSvg" viewBox="0 0 300 54" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <div class="shape-meta"><span id="cycleMeta"></span><span id="totalMeta"></span></div>
+  </section>
+
+  <section class="sliders" id="sliders" aria-label="Customize timing">
+    <div class="row"><label for="sIn">Breathe in</label><span class="val" id="vIn"></span><input id="sIn" type="range" min="1" max="12" step="1"></div>
+    <div class="row"><label for="sHin">Hold after in</label><span class="val" id="vHin"></span><input id="sHin" type="range" min="0" max="12" step="1"></div>
+    <div class="row"><label for="sOut">Breathe out</label><span class="val" id="vOut"></span><input id="sOut" type="range" min="1" max="16" step="1"></div>
+    <div class="row"><label for="sHout">Hold after out</label><span class="val" id="vHout"></span><input id="sHout" type="range" min="0" max="12" step="1"></div>
+    <div class="row rounds-row"><label for="sRounds">Breaths</label><span class="val" id="vRounds"></span><input id="sRounds" type="range" min="1" max="30" step="1">
+      <label class="endless" style="grid-column:1/-1"><input id="endless" type="checkbox"> Keep going until I stop</label>
+    </div>
+  </section>
+
+  <p class="foot">Breathe through the nose if you can. Stop any time you feel lightheaded.</p>
+</div>
+
+<script>
+(function () {
+  var PRESETS = [
+    { id: 'mine', name: '4-1-8-1', sub: 'Your pattern', t: [4, 1, 8, 1], rounds: 6, rec: true,
+      desc: 'Your own rhythm: a short pause at the top and bottom, and an exhale twice as long as the inhale.' },
+    { id: 'sleep', name: '4-7-8', sub: 'Wind down', t: [4, 7, 8, 0], rounds: 4,
+      desc: 'The long exhale slows your heart rate. Four breaths is the usual place to start. Build up over a few weeks.' },
+    { id: 'box', name: 'Box 4-4-4-4', sub: 'Steady focus', t: [4, 4, 4, 4], rounds: 6,
+      desc: 'Equal sides, a pause at the top and at the bottom. Used to settle nerves before something demanding.' },
+    { id: 'calm', name: 'Calm 4-6', sub: 'Longer exhale', t: [4, 0, 6, 0], rounds: 8,
+      desc: 'No holds, just an exhale that runs half again as long as the inhale. Easy to do anywhere.' },
+    { id: 'coherent', name: 'Coherent 5-5', sub: 'Even rhythm', t: [5, 0, 5, 0], rounds: 12,
+      desc: 'Six breaths a minute, smooth and even. Good for a couple of quiet minutes between tasks.' }
+  ];
+  var NAMES = ['Breathe in', 'Hold', 'Breathe out', 'Hold'];
+  var $ = function (id) { return document.getElementById(id); };
+  var sl = [$('sIn'), $('sHin'), $('sOut'), $('sHout')];
+  var vals = [$('vIn'), $('vHin'), $('vOut'), $('vHout')];
+  var sRounds = $('sRounds'), vRounds = $('vRounds'), endless = $('endless');
+  var orbWrap = $('orbWrap'), orb = $('orb'), glow = $('glow'), prog = $('prog'), count = $('count');
+  var phaseEl = $('phase'), phaseSub = $('phaseSub'), orbBox = $('orbBox');
+  var counterNum = $('counterNum'), dotsEl = $('dots'), startBtn = $('startBtn');
+  var CIRC = 305.4;
+
+  var running = false, startT = 0, raf = 0, wakeLock = null, lastKey = '';
+  var plan = { t: [4, 7, 8, 0], rounds: 4, inf: false };
+
+  /* storage: light per-viewer convenience only */
+  function todayKey() { var d = new Date(); return 'tide-' + d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function getToday() { try { return parseInt(localStorage.getItem(todayKey()) || '0', 10) || 0; } catch (e) { return 0; } }
+  function addToday(n) { try { localStorage.setItem(todayKey(), String(getToday() + n)); } catch (e) {} showToday(); }
+  var memToday = 0;
+  function showToday() { var n = getToday() || memToday; $('today').textContent = n ? n + (n === 1 ? ' breath today' : ' breaths today') : ''; }
+
+  function fmt(sec) { var m = Math.floor(sec / 60), s = Math.round(sec % 60); return m ? m + ':' + String(s).padStart(2, '0') : s + ' s'; }
+  function cycleLen() { return plan.t[0] + plan.t[1] + plan.t[2] + plan.t[3]; }
+  function ease(p) { return 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, Math.max(0, p))); }
+  function setFill(el) { var min = +el.min, max = +el.max; el.style.setProperty('--fill', ((el.value - min) / (max - min) * 100) + '%'); }
+
+  /* build presets */
+  var presetsEl = $('presets');
+  PRESETS.forEach(function (p) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'preset'; b.dataset.id = p.id; b.setAttribute('aria-pressed', 'false');
+    b.innerHTML = '<span class="tag' + (p.rec ? '' : ' spacer') + '">Default</span><span class="p-name">' + p.name + '</span><span class="p-sub">' + p.sub + ' · ' + p.rounds + ' breaths</span>';
+    b.addEventListener('click', function () { if (!running) applyPreset(p); });
+    presetsEl.appendChild(b);
+  });
+
+  function applyPreset(p) {
+    for (var i = 0; i < 4; i++) sl[i].value = p.t[i];
+    sRounds.value = p.rounds; endless.checked = false;
+    readControls();
+  }
+
+  function readControls() {
+    plan.t = sl.map(function (s) { return +s.value; });
+    plan.rounds = +sRounds.value; plan.inf = endless.checked;
+    for (var i = 0; i < 4; i++) { vals[i].textContent = plan.t[i] + ' s'; setFill(sl[i]); }
+    vRounds.textContent = plan.inf ? '∞' : plan.rounds; setFill(sRounds);
+    sRounds.disabled = plan.inf; sRounds.style.opacity = plan.inf ? .4 : 1;
+    /* match preset */
+    var match = null;
+    PRESETS.forEach(function (p) {
+      if (p.t.every(function (v, i) { return v === plan.t[i]; }) && p.rounds === plan.rounds && !plan.inf) match = p;
+    });
+    var btns = presetsEl.children;
+    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-pressed', match && btns[j].dataset.id === match.id ? 'true' : 'false');
+    $('customTag').textContent = match ? '' : 'Custom';
+    $('desc').textContent = match ? match.desc : 'Your own timing. The sliders above shape every breath; the line below shows what one breath looks like.';
+    drawShape(); renderIdle();
+  }
+
+  function drawShape() {
+    var t = plan.t, total = cycleLen(), W = 300, H = 54, top = 6, bot = H - 6;
+    var x = 0, pts = [[0, bot]], hold = [];
+    function seg(d, y0, y1, isHold) {
+      var x1 = x + d / total * W; pts.push([x1, y1]);
+      if (isHold && d > 0) hold.push([x, y0, x1, y1]);
+      x = x1;
+    }
+    seg(t[0], bot, top, false); seg(t[1], top, top, true); seg(t[2], top, bot, false); seg(t[3], bot, bot, true);
+    var d = 'M' + pts.map(function (p) { return p[0].toFixed(1) + ' ' + p[1]; }).join(' L');
+    var holds = hold.map(function (h) { return '<line class="path hl" x1="' + h[0].toFixed(1) + '" y1="' + h[1] + '" x2="' + h[2].toFixed(1) + '" y2="' + h[3] + '"/>'; }).join('');
+    $('shapeSvg').innerHTML = '<path class="fillp" d="' + d + ' L' + W + ' ' + H + ' L0 ' + H + ' Z"/><path class="path" d="' + d + '"/>' + holds;
+    $('cycleMeta').textContent = plan.t.filter(function (v) { return v > 0; }).join(' · ') + ' s per breath';
+    var tot = plan.inf ? 'No end' : 'About ' + fmt(total * plan.rounds);
+    $('totalMeta').textContent = plan.inf ? 'Open-ended' : tot;
+  }
+
+  function buildDots(n) {
+    dotsEl.innerHTML = '';
+    if (plan.inf || n > 30) return;
+    for (var i = 0; i < n; i++) { var d = document.createElement('span'); d.className = 'dot'; dotsEl.appendChild(d); }
+  }
+
+  function setOrb(scale, glowO) { orbWrap.style.transform = 'scale(' + scale.toFixed(4) + ')'; glow.style.opacity = glowO.toFixed(3); }
+
+  function renderIdle() {
+    orbBox.classList.add('idle'); glow.style.opacity = ''; setOrb(0.5, 0.45);
+    orb.classList.remove('hold'); prog.classList.remove('hold'); prog.style.strokeDashoffset = CIRC;
+    count.textContent = plan.t[0];
+    phaseEl.textContent = 'Ready'; phaseSub.textContent = 'Settle in and press begin';
+    counterNum.innerHTML = plan.inf ? 'Breaths <b>∞</b>' : 'Breaths <b>' + plan.rounds + '</b>';
+    buildDots(plan.rounds);
+    startBtn.textContent = 'Begin'; startBtn.className = 'btn';
+  }
+
+  function updateDots(done, cur) {
+    var kids = dotsEl.children;
+    for (var i = 0; i < kids.length; i++) {
+      kids[i].className = 'dot' + (i < done ? ' on' : '') + (i === cur && cur < kids.length ? ' now' : '');
+    }
+  }
+
+  function tick(now) {
+    if (!running) return;
+    var t = (now - startT) / 1000, cl = cycleLen();
+    if (!plan.inf && t >= cl * plan.rounds) { finish(true); return; }
+    var c = Math.floor(t / cl), within = t - c * cl, off = 0, i = 0;
+    for (; i < 4; i++) { if (plan.t[i] > 0 && within < off + plan.t[i]) break; off += plan.t[i]; }
+    if (i > 3) i = 3;
+    var dur = plan.t[i], el = within - off, p = dur ? el / dur : 1, s;
+    if (i === 0) s = ease(p); else if (i === 1) s = 1; else if (i === 2) s = 1 - ease(p); else s = 0;
+    var isHold = (i === 1 || i === 3);
+    setOrb(0.5 + 0.5 * s, 0.4 + 0.45 * s);
+    prog.style.strokeDashoffset = (CIRC * (1 - p)).toFixed(2);
+    var remain = Math.max(1, Math.ceil(dur - el));
+    var key = c + '|' + i + '|' + remain;
+    if (key !== lastKey) {
+      lastKey = key;
+      count.textContent = remain;
+      phaseEl.textContent = i === 3 ? 'Rest' : NAMES[i];
+      phaseSub.textContent = plan.inf ? 'Breath ' + (c + 1) : 'Breath ' + (c + 1) + ' of ' + plan.rounds;
+      orb.classList.toggle('hold', isHold); prog.classList.toggle('hold', isHold);
+      counterNum.innerHTML = plan.inf ? 'Breaths <b>' + c + '</b> done' : '<b>' + c + '</b> of ' + plan.rounds + ' done';
+      updateDots(c, c);
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  function lock(on) { $('sliders').classList.toggle('locked', on); presetsEl.style.opacity = on ? .5 : 1; presetsEl.style.pointerEvents = on ? 'none' : ''; }
+
+  async function wake(on) {
+    try {
+      if (on && navigator.wakeLock) wakeLock = await navigator.wakeLock.request('screen');
+      else if (wakeLock) { await wakeLock.release(); wakeLock = null; }
+    } catch (e) { wakeLock = null; }
+  }
+
+  function start() {
+    running = true; lastKey = ''; lock(true); orbBox.classList.remove('idle');
+    startBtn.textContent = 'Stop'; startBtn.className = 'btn ghost';
+    startT = performance.now(); wake(true);
+    raf = requestAnimationFrame(tick);
+  }
+
+  function elapsedBreaths() { return Math.floor(((performance.now() - startT) / 1000) / cycleLen()); }
+
+  function finish(completed) {
+    var n = completed ? plan.rounds : Math.min(elapsedBreaths(), plan.inf ? 1e9 : plan.rounds);
+    running = false; cancelAnimationFrame(raf); lock(false); wake(false);
+    if (n > 0) { memToday += n; addToday(n); }
+    if (completed) {
+      orbBox.classList.add('idle'); setOrb(0.5, 0.5); count.textContent = '✓';
+      orb.classList.remove('hold'); prog.classList.remove('hold'); prog.style.strokeDashoffset = 0;
+      phaseEl.textContent = 'Well done'; phaseSub.textContent = plan.rounds + ' breaths · ' + fmt(cycleLen() * plan.rounds);
+      counterNum.innerHTML = '<b>' + plan.rounds + '</b> of ' + plan.rounds + ' done';
+      updateDots(plan.rounds, -1);
+      startBtn.textContent = 'Again'; startBtn.className = 'btn';
+    } else {
+      renderIdle();
+      if (n > 0) phaseSub.textContent = n + (n === 1 ? ' breath' : ' breaths') + ' completed';
+    }
+  }
+
+  startBtn.addEventListener('click', function () { running ? finish(false) : start(); });
+  sl.concat([sRounds, endless]).forEach(function (el) { el.addEventListener('input', function () { if (!running) readControls(); }); });
+  document.addEventListener('visibilitychange', function () { if (running && !document.hidden && !wakeLock) wake(true); });
+
+  /* recommended default */
+  showToday();
+  applyPreset(PRESETS[0]);
+})();
+</script>
+</body>
+</html>
