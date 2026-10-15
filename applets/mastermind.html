@@ -107,6 +107,8 @@
             padding: 25px;
             max-width: 400px;
             width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
             border: 1px solid rgba(255, 255, 255, 0.2);
             transform: scale(0.9);
             transition: transform 0.3s ease;
@@ -245,6 +247,26 @@
             background: rgba(79, 195, 220, 0.2);
             border: 1px solid rgba(79, 195, 220, 0.5);
             color: #4fc3dc;
+        }
+
+        .timer-display {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+            color: #4fc3dc;
+        }
+
+        .timer-display.low {
+            color: #e74c3c;
+        }
+
+        .guesses-hidden-note {
+            text-align: center;
+            font-size: 0.85rem;
+            opacity: 0.7;
+            padding: 6px;
         }
 
         .secret-code {
@@ -643,26 +665,47 @@
             <div class="modal">
                 <h2>⚙️ Settings</h2>
                 <div class="setting-row">
-                    <label for="numSymbols">Number of Symbols:</label>
+                    <label for="numSymbols">Symbols to choose from (4–10):</label>
                     <input type="number" id="numSymbols" min="4" max="10" value="4">
                 </div>
                 <div class="setting-row">
-                    <label for="numSlots">Code Length:</label>
+                    <label for="numSlots">Code length (2–6):</label>
                     <input type="number" id="numSlots" min="2" max="6" value="4">
                 </div>
                 <div class="setting-row">
-                    <label for="numGuesses">Max Guesses:</label>
+                    <label for="numGuesses">Guesses allowed (4–20):</label>
                     <input type="number" id="numGuesses" min="4" max="20" value="7">
                 </div>
                 <hr style="border-color: rgba(255,255,255,0.2); margin: 15px 0;">
                 <div class="setting-row">
-                    <label for="solverMode">Solver Mode (you enter feedback):</label>
-                    <input type="checkbox" id="solverMode">
+                    <label for="solverMode">Solver Mode</label>
+                    <input type="checkbox" id="solverMode" onchange="updateSettingsVisibility()">
                 </div>
                 <p class="setting-description">
-                    When on: You enter feedback manually (for physical game)<br>
-                    When off: Computer generates secret code
+                    Off (default): the computer picks a secret code and scores your guesses.<br>
+                    On: for a physical game. You type in the Exact and Partial pegs yourself.
                 </p>
+                <div id="defaultOptions">
+                    <hr style="border-color: rgba(255,255,255,0.2); margin: 15px 0;">
+                    <div class="setting-row">
+                        <label for="timerEnabled">Timer</label>
+                        <input type="checkbox" id="timerEnabled" onchange="updateSettingsVisibility()">
+                    </div>
+                    <div class="setting-row" id="timeLimitRow">
+                        <label for="timeLimit">Time limit (seconds):</label>
+                        <input type="number" id="timeLimit" min="0" max="3600" value="0">
+                    </div>
+                    <p class="setting-description">
+                        The timer starts on your first move. Leave the limit at 0 to count up; set a limit to count down. When time runs out, the game is lost.
+                    </p>
+                    <div class="setting-row">
+                        <label for="hideGuesses">Hide previous guesses</label>
+                        <input type="checkbox" id="hideGuesses">
+                    </div>
+                    <p class="setting-description">
+                        Only your latest guess stays visible. Earlier ones are revealed when the game ends.
+                    </p>
+                </div>
                 <div class="modal-buttons">
                     <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
                     <button class="btn btn-primary" onclick="applySettings()">Apply & Restart</button>
@@ -672,6 +715,8 @@
 
         <div class="game-area">
             <div class="mode-indicator solver" id="modeIndicator" style="display: none;"></div>
+
+            <div class="timer-display" id="timerDisplay" style="display: none;"></div>
 
             <div class="status" id="status">Make your guess!</div>
             <button class="btn btn-refresh" id="refreshBtn" onclick="initGame()" style="display: none;">🔄 New Game</button>
@@ -711,18 +756,20 @@
 
             <div class="instructions">
                 <h3>How to Play</h3>
-                <p>🎯 Crack the secret code!</p>
-                <p>1. Click a symbol, then click a slot to place it</p>
-                <p>2. Submit your guess, then enter (or receive) feedback</p>
-                <p>3. <strong>💡 Hint</strong> suggests the optimal next guess!</p>
+                <p>🎯 Work out the secret code before you run out of guesses. A code is a row of symbols, and a symbol can appear more than once.</p>
+                <p>1. Tap a symbol to place it in the highlighted slot. Tap a slot to choose where the next symbol goes.</p>
+                <p>2. Fill every slot, then tap <strong>✓ Submit</strong>. <strong>🗑️ Clear</strong> empties the row.</p>
+                <p id="modeInstructions"></p>
+                <p>4. <strong>💡 Hint</strong> fills the row with a strong next guess, based on the codes that are still possible.</p>
+                <p id="optionInstructions"></p>
                 <div class="peg-legend">
                     <div class="peg-legend-item">
                         <div class="peg exact"></div>
-                        <span>Correct symbol & position</span>
+                        <span>Exact: right symbol, right slot</span>
                     </div>
                     <div class="peg-legend-item">
                         <div class="peg partial"></div>
-                        <span>Correct symbol, wrong position</span>
+                        <span>Partial: right symbol, wrong slot</span>
                     </div>
                 </div>
             </div>
@@ -748,7 +795,10 @@
             numSymbols: 4,
             numSlots: 4,
             numGuesses: 7,
-            playMode: true
+            playMode: true,
+            timerEnabled: false,
+            timeLimit: 0,        // seconds; 0 = count up with no limit
+            hideGuesses: false
         };
 
         let gameState = {
@@ -773,6 +823,10 @@
             document.getElementById('numSlots').value = config.numSlots;
             document.getElementById('numGuesses').value = config.numGuesses;
             document.getElementById('solverMode').checked = !config.playMode;
+            document.getElementById('timerEnabled').checked = config.timerEnabled;
+            document.getElementById('timeLimit').value = config.timeLimit;
+            document.getElementById('hideGuesses').checked = config.hideGuesses;
+            updateSettingsVisibility();
             document.getElementById('settingsModal').classList.add('active');
         }
 
@@ -785,6 +839,9 @@
             config.numSlots = clamp(parseInt(document.getElementById('numSlots').value) || 4, 2, 6);
             config.numGuesses = clamp(parseInt(document.getElementById('numGuesses').value) || 7, 4, 20);
             config.playMode = !document.getElementById('solverMode').checked;
+            config.timerEnabled = document.getElementById('timerEnabled').checked;
+            config.timeLimit = clamp(parseInt(document.getElementById('timeLimit').value) || 0, 0, 3600);
+            config.hideGuesses = document.getElementById('hideGuesses').checked;
             closeSettings();
             initGame();
         }
@@ -852,7 +909,142 @@
             document.getElementById('hintBtn').disabled = false;
             document.getElementById('hintBtn').textContent = '💡 Hint';
             showRefresh(false);
+            resetTimer();
+            updateInstructions();
             document.getElementById('submitBtn').disabled = true;
+        }
+
+        // Settings: the timer / hide-guesses options only apply to the default (non-solver) mode.
+        function updateSettingsVisibility() {
+            const solver = document.getElementById('solverMode').checked;
+            document.getElementById('defaultOptions').style.display = solver ? 'none' : 'block';
+            document.getElementById('timeLimitRow').style.display =
+                document.getElementById('timerEnabled').checked ? 'flex' : 'none';
+        }
+
+        // Rules text that matches the current mode and options.
+        function updateInstructions() {
+            const modeP = document.getElementById('modeInstructions');
+            const optP = document.getElementById('optionInstructions');
+
+            if (config.playMode) {
+                modeP.textContent = '3. The game scores each guess with pegs. Get every peg to Exact to crack the code.';
+            } else {
+                modeP.textContent = '3. Solver Mode is for a physical game. After each guess, enter the Exact and Partial pegs you were given and tap Submit Feedback. The game tracks which codes are still possible.';
+            }
+
+            const extras = [];
+            if (config.playMode && config.timerEnabled) {
+                extras.push(config.timeLimit > 0
+                    ? `⏱️ You have ${formatTime(config.timeLimit)} to crack the code. The clock starts on your first move.`
+                    : '⏱️ The timer counts up from your first move.');
+            }
+            if (config.playMode && config.hideGuesses) {
+                extras.push('🙈 Only your latest guess stays visible. Earlier guesses are revealed when the game ends.');
+            }
+            optP.textContent = extras.join(' ');
+            optP.style.display = extras.length ? 'block' : 'none';
+        }
+
+        // ---- Timer (default mode only) ----
+        let timerInterval = null;
+        let timerStartMs = null;
+        let timerEndMs = null;
+
+        function timerActive() {
+            return config.playMode && config.timerEnabled;
+        }
+
+        function formatTime(totalSeconds) {
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            return m + ':' + String(s).padStart(2, '0');
+        }
+
+        function timerElapsedMs() {
+            if (timerStartMs === null) return 0;
+            return (timerEndMs !== null ? timerEndMs : Date.now()) - timerStartMs;
+        }
+
+        function updateTimerDisplay() {
+            const el = document.getElementById('timerDisplay');
+            if (!timerActive()) {
+                el.style.display = 'none';
+                return;
+            }
+            el.style.display = 'block';
+
+            let seconds;
+            let low = false;
+            if (config.timeLimit > 0) {
+                const remainingMs = Math.max(0, config.timeLimit * 1000 - timerElapsedMs());
+                seconds = Math.ceil(remainingMs / 1000);
+                low = timerStartMs !== null && seconds <= 10;
+            } else {
+                seconds = Math.floor(timerElapsedMs() / 1000);
+            }
+            el.textContent = '⏱️ ' + formatTime(seconds);
+            el.classList.toggle('low', low);
+        }
+
+        function tickTimer() {
+            if (gameState.gameOver) {
+                stopTimer();
+                return;
+            }
+            updateTimerDisplay();
+            if (config.timeLimit > 0 && timerElapsedMs() >= config.timeLimit * 1000) {
+                timeUp();
+            }
+        }
+
+        function startTimer() {
+            if (!timerActive() || timerStartMs !== null || gameState.gameOver) return;
+            timerStartMs = Date.now();
+            timerInterval = setInterval(tickTimer, 250);
+            updateTimerDisplay();
+        }
+
+        function stopTimer() {
+            if (timerInterval !== null) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            if (timerStartMs !== null && timerEndMs === null) {
+                timerEndMs = Date.now();
+            }
+        }
+
+        function resetTimer() {
+            if (timerInterval !== null) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            timerStartMs = null;
+            timerEndMs = null;
+            updateTimerDisplay();
+        }
+
+        function timeUp() {
+            if (gameState.gameOver) return;
+            timerEndMs = timerStartMs + config.timeLimit * 1000;
+            stopTimer();
+            gameState.gameOver = true;
+            renderSecretCode(true);
+            renderCurrentGuess();
+            updateSubmitButton();
+            hideHint();
+            document.getElementById('hintBtn').disabled = true;
+            updateStatus("⏰ Time's up!", 'lose');
+            showRefresh(true);
+            endGameCleanup();
+        }
+
+        // Common end-of-game work: freeze the clock and reveal any hidden guesses.
+        function endGameCleanup() {
+            stopTimer();
+            updateTimerDisplay();
+            renderGuesses();
         }
 
         function showRefresh(show) {
@@ -927,6 +1119,7 @@
         function selectSymbol(symbolIndex) {
             if (gameState.gameOver || gameState.waitingForFeedback) return;
 
+            startTimer();
             gameState.selectedSymbol = symbolIndex;
 
             document.querySelectorAll('.symbol-option').forEach((el, i) => {
@@ -935,9 +1128,11 @@
 
             gameState.currentGuess[gameState.activeSlot] = symbolIndex;
 
-            let nextSlot = (gameState.activeSlot + 1) % config.numSlots;
-            for (let i = 0; i < config.numSlots; i++) {
-                const checkSlot = (gameState.activeSlot + 1 + i) % config.numSlots;
+            // Move to the next empty slot (wrapping only to find a gap). If every slot
+            // is now filled, stay on the current one instead of looping back to the first.
+            let nextSlot = gameState.activeSlot;
+            for (let i = 1; i < config.numSlots; i++) {
+                const checkSlot = (gameState.activeSlot + i) % config.numSlots;
                 if (gameState.currentGuess[checkSlot] === null) {
                     nextSlot = checkSlot;
                     break;
@@ -1099,6 +1294,7 @@
                 updateSubmitButton();
                 updateStatus('🎉 Code cracked!', 'win');
                 showRefresh(true);
+                endGameCleanup();
                 document.getElementById('hintBtn').disabled = true;
                 return;
             }
@@ -1112,6 +1308,7 @@
                 updateSubmitButton();
                 updateStatus('😔 Out of guesses!', 'lose');
                 showRefresh(true);
+                endGameCleanup();
                 document.getElementById('hintBtn').disabled = true;
                 return;
             }
@@ -1212,6 +1409,7 @@
         }
 
         function applyHint(guess) {
+            startTimer();
             gameState.currentGuess = [...guess];
             renderCurrentGuess();
             updateSubmitButton();
@@ -1253,7 +1451,12 @@
             const guessesDiv = document.getElementById('guesses');
             guessesDiv.innerHTML = '';
 
-            for (let i = gameState.guesses.length - 1; i >= 0; i--) {
+            // "Hide previous guesses" (default mode): show only the latest guess until the game ends.
+            const hideOlder = config.playMode && config.hideGuesses && !gameState.gameOver;
+            const lastIndex = gameState.guesses.length - 1;
+
+            for (let i = lastIndex; i >= 0; i--) {
+                if (hideOlder && i < lastIndex) break;
                 const { guess, feedback } = gameState.guesses[i];
 
                 const row = document.createElement('div');
@@ -1301,6 +1504,13 @@
 
                 row.appendChild(feedbackDiv);
                 guessesDiv.appendChild(row);
+            }
+
+            if (hideOlder && lastIndex > 0) {
+                const note = document.createElement('div');
+                note.className = 'guesses-hidden-note';
+                note.textContent = `🙈 ${lastIndex} earlier guess${lastIndex !== 1 ? 'es' : ''} hidden until the game ends`;
+                guessesDiv.appendChild(note);
             }
         }
 
