@@ -9,6 +9,24 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* No text selection / long-press callout on the game pieces only */
+        .btn,
+        .settings-btn,
+        .symbol-palette,
+        .symbol-option,
+        .current-guess,
+        .guess-slot,
+        .secret-code,
+        .secret-slot,
+        .guesses,
+        .guess-symbol,
+        .feedback {
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
         }
 
         body {
@@ -367,6 +385,16 @@
             box-shadow: 0 5px 20px rgba(231, 76, 60, 0.4);
         }
 
+        .btn-refresh {
+            background: linear-gradient(135deg, #4fc3dc 0%, #0fadcf 100%);
+            color: #1a1a2e;
+            margin: -5px auto 15px;
+        }
+
+        .btn-refresh:hover {
+            box-shadow: 0 5px 20px rgba(79, 195, 220, 0.4);
+        }
+
         .btn-hint {
             background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
             color: #fff;
@@ -628,12 +656,12 @@
                 </div>
                 <hr style="border-color: rgba(255,255,255,0.2); margin: 15px 0;">
                 <div class="setting-row">
-                    <label for="playMode">Play Mode (computer has answer):</label>
-                    <input type="checkbox" id="playMode">
+                    <label for="solverMode">Solver Mode (you enter feedback):</label>
+                    <input type="checkbox" id="solverMode">
                 </div>
                 <p class="setting-description">
-                    When off: You enter feedback manually (for physical game)<br>
-                    When on: Computer generates secret code
+                    When on: You enter feedback manually (for physical game)<br>
+                    When off: Computer generates secret code
                 </p>
                 <div class="modal-buttons">
                     <button class="btn btn-secondary" onclick="closeSettings()">Cancel</button>
@@ -643,26 +671,26 @@
         </div>
 
         <div class="game-area">
-            <div class="mode-indicator" id="modeIndicator">🧠 Solver Mode - Enter feedback manually</div>
-            
+            <div class="mode-indicator solver" id="modeIndicator" style="display: none;"></div>
+
             <div class="status" id="status">Make your guess!</div>
-            
+            <button class="btn btn-refresh" id="refreshBtn" onclick="initGame()" style="display: none;">🔄 New Game</button>
+
             <div class="secret-code" id="secretCode"></div>
 
             <div class="hint-info" id="hintInfo">
-                <div class="hint-label">🧠 AI Suggestion (Knuth's Algorithm)</div>
+                <div class="hint-label">💡 AI Suggestion (Knuth's Algorithm)</div>
                 <div class="hint-stats" id="hintStats"></div>
             </div>
-            
+
             <div class="symbol-palette" id="symbolPalette"></div>
-            
+
             <div class="current-guess" id="currentGuess"></div>
-            
+
             <div class="controls">
                 <button class="btn btn-clear" onclick="clearGuess()">🗑️ Clear</button>
-                <button class="btn btn-hint" id="hintBtn" onclick="getHint()">🧠 Hint</button>
-                <button class="btn btn-submit" id="submitBtn" onclick="submitGuess()" disabled>✓ Submit</button>
-            </div>
+                <button class="btn btn-hint" id="hintBtn" onclick="getHint()">💡 Hint</button>
+                <button class="btn btn-submit" id="submitBtn" onclick="submitGuess()" disabled>✓ Submit</button>            </div>
 
             <div class="feedback-panel" id="feedbackPanel">
                 <h3>Enter feedback for your guess:</h3>
@@ -678,15 +706,15 @@
                 </div>
                 <button class="btn btn-feedback" onclick="submitFeedback()">Submit Feedback</button>
             </div>
-            
+
             <div class="guesses" id="guesses"></div>
-            
+
             <div class="instructions">
                 <h3>How to Play</h3>
                 <p>🎯 Crack the secret code!</p>
                 <p>1. Click a symbol, then click a slot to place it</p>
                 <p>2. Submit your guess, then enter (or receive) feedback</p>
-                <p>3. <strong>🧠 Hint</strong> suggests the optimal next guess!</p>
+                <p>3. <strong>💡 Hint</strong> suggests the optimal next guess!</p>
                 <div class="peg-legend">
                     <div class="peg-legend-item">
                         <div class="peg exact"></div>
@@ -715,15 +743,16 @@
             { emoji: '🟤', name: 'Brown' }
         ];
 
+        // Default is Play Mode. The mode lives in config and is preserved on every restart.
         let config = {
             numSymbols: 4,
             numSlots: 4,
             numGuesses: 7,
-            playMode: false
+            playMode: true
         };
 
         let gameState = {
-            secretCode: [],
+            secretCode: null,
             currentGuess: [],
             guesses: [],
             selectedSymbol: null,
@@ -743,7 +772,7 @@
             document.getElementById('numSymbols').value = config.numSymbols;
             document.getElementById('numSlots').value = config.numSlots;
             document.getElementById('numGuesses').value = config.numGuesses;
-            document.getElementById('playMode').checked = config.playMode;
+            document.getElementById('solverMode').checked = !config.playMode;
             document.getElementById('settingsModal').classList.add('active');
         }
 
@@ -755,7 +784,7 @@
             config.numSymbols = clamp(parseInt(document.getElementById('numSymbols').value) || 4, 4, 10);
             config.numSlots = clamp(parseInt(document.getElementById('numSlots').value) || 4, 2, 6);
             config.numGuesses = clamp(parseInt(document.getElementById('numGuesses').value) || 7, 4, 20);
-            config.playMode = document.getElementById('playMode').checked;
+            config.playMode = !document.getElementById('solverMode').checked;
             closeSettings();
             initGame();
         }
@@ -767,7 +796,7 @@
         function generateAllCodes() {
             const codes = [];
             const total = Math.pow(config.numSymbols, config.numSlots);
-            
+
             for (let i = 0; i < total; i++) {
                 const code = [];
                 let n = i;
@@ -780,6 +809,7 @@
             return codes;
         }
 
+        // Starts a fresh game in the CURRENT mode (config.playMode is never changed here).
         function initGame() {
             if (config.playMode) {
                 gameState.secretCode = [];
@@ -803,11 +833,13 @@
 
             const modeIndicator = document.getElementById('modeIndicator');
             if (config.playMode) {
-                modeIndicator.textContent = '🎮 Play Mode - Computer has the secret code';
-                modeIndicator.className = 'mode-indicator play';
+                // Default game: no banner
+                modeIndicator.textContent = '';
+                modeIndicator.style.display = 'none';
             } else {
-                modeIndicator.textContent = '🧠 Solver Mode - Enter feedback manually';
+                modeIndicator.textContent = '🔍 Solver Mode - Enter feedback manually';
                 modeIndicator.className = 'mode-indicator solver';
+                modeIndicator.style.display = 'block';
             }
 
             renderSymbolPalette();
@@ -818,7 +850,13 @@
             hideHint();
             updateStatus(`Make your guess! (${config.numGuesses} attempts remaining)`);
             document.getElementById('hintBtn').disabled = false;
+            document.getElementById('hintBtn').textContent = '💡 Hint';
+            showRefresh(false);
             document.getElementById('submitBtn').disabled = true;
+        }
+
+        function showRefresh(show) {
+            document.getElementById('refreshBtn').style.display = show ? 'block' : 'none';
         }
 
         function renderSymbolPalette() {
@@ -839,26 +877,16 @@
             const secretDiv = document.getElementById('secretCode');
             secretDiv.innerHTML = '';
 
-            if (!config.playMode && !revealed) {
-                for (let i = 0; i < config.numSlots; i++) {
-                    const slot = document.createElement('div');
-                    slot.className = 'secret-slot';
-                    slot.textContent = '?';
-                    secretDiv.appendChild(slot);
-                }
-                return;
-            }
-
             for (let i = 0; i < config.numSlots; i++) {
                 const slot = document.createElement('div');
                 slot.className = 'secret-slot' + (revealed ? ' revealed' : '');
-                
+
                 if (revealed && gameState.secretCode) {
                     slot.textContent = SYMBOLS[gameState.secretCode[i]].emoji;
                 } else {
                     slot.textContent = '?';
                 }
-                
+
                 secretDiv.appendChild(slot);
             }
         }
@@ -871,12 +899,12 @@
                 const slot = document.createElement('div');
                 slot.className = 'guess-slot';
                 slot.dataset.slot = i;
-                
+
                 if (gameState.currentGuess[i] !== null) {
                     slot.classList.add('filled');
                     slot.textContent = SYMBOLS[gameState.currentGuess[i]].emoji;
                 }
-                
+
                 if (i === gameState.activeSlot && !gameState.gameOver && !gameState.waitingForFeedback) {
                     slot.classList.add('active');
                 }
@@ -906,7 +934,7 @@
             });
 
             gameState.currentGuess[gameState.activeSlot] = symbolIndex;
-            
+
             let nextSlot = (gameState.activeSlot + 1) % config.numSlots;
             for (let i = 0; i < config.numSlots; i++) {
                 const checkSlot = (gameState.activeSlot + 1 + i) % config.numSlots;
@@ -931,11 +959,11 @@
             gameState.currentGuess = new Array(config.numSlots).fill(null);
             gameState.activeSlot = 0;
             gameState.selectedSymbol = null;
-            
+
             document.querySelectorAll('.symbol-option').forEach(el => {
                 el.classList.remove('selected');
             });
-            
+
             renderCurrentGuess();
             updateSubmitButton();
             hideHint();
@@ -944,7 +972,7 @@
         function calculateFeedback(guess, secret) {
             let exact = 0;
             let partial = 0;
-            
+
             const secretCopy = [...secret];
             const guessCopy = [...guess];
 
@@ -981,7 +1009,7 @@
             if (gameState.currentGuess.some(c => c === null)) return;
 
             const guess = [...gameState.currentGuess];
-            
+
             if (config.playMode) {
                 const feedback = calculateFeedback(guess, gameState.secretCode);
                 processGuess(guess, feedback);
@@ -989,9 +1017,11 @@
                 gameState.waitingForFeedback = true;
                 gameState.guesses.push({ guess, feedback: null });
                 renderGuesses();
+                renderCurrentGuess();
                 showFeedbackPanel();
                 updateStatus('Enter feedback for this guess');
                 document.getElementById('submitBtn').disabled = true;
+                document.getElementById('hintBtn').disabled = true;
                 document.getElementById('exactPegs').max = config.numSlots;
                 document.getElementById('partialPegs').max = config.numSlots;
                 document.getElementById('exactPegs').value = 0;
@@ -1010,21 +1040,42 @@
         }
 
         function submitFeedback() {
+            if (!gameState.waitingForFeedback) return;
+
             const exact = parseInt(document.getElementById('exactPegs').value) || 0;
             const partial = parseInt(document.getElementById('partialPegs').value) || 0;
+
+            if (exact < 0 || partial < 0) {
+                alert('Peg counts cannot be negative.');
+                return;
+            }
 
             if (exact + partial > config.numSlots) {
                 alert(`Total pegs cannot exceed ${config.numSlots}`);
                 return;
             }
 
+            // Impossible by the rules: if all but one are exact, the last can't be a partial.
+            if (exact === config.numSlots - 1 && partial === 1) {
+                alert('That combination is impossible in Mastermind. Please re-check your feedback.');
+                return;
+            }
+
             const feedback = { exact, partial };
             const guess = gameState.guesses[gameState.guesses.length - 1].guess;
-            
+
+            // Reject feedback that contradicts everything entered so far,
+            // and let the user correct it instead of committing it.
+            if (filterCodes(gameState.possibleCodes, guess, feedback).length === 0) {
+                alert('That feedback is inconsistent with your earlier feedback (no code could match all of it). Please re-check it.');
+                return;
+            }
+
             gameState.guesses[gameState.guesses.length - 1].feedback = feedback;
             gameState.waitingForFeedback = false;
             hideFeedbackPanel();
-            
+            document.getElementById('hintBtn').disabled = false;
+
             processGuessResult(guess, feedback);
         }
 
@@ -1044,7 +1095,10 @@
                 if (config.playMode) {
                     renderSecretCode(true);
                 }
+                renderCurrentGuess();
+                updateSubmitButton();
                 updateStatus('🎉 Code cracked!', 'win');
+                showRefresh(true);
                 document.getElementById('hintBtn').disabled = true;
                 return;
             }
@@ -1054,28 +1108,21 @@
                 if (config.playMode) {
                     renderSecretCode(true);
                 }
+                renderCurrentGuess();
+                updateSubmitButton();
                 updateStatus('😔 Out of guesses!', 'lose');
+                showRefresh(true);
                 document.getElementById('hintBtn').disabled = true;
                 return;
-            }
-
-            if (gameState.possibleCodes.length === 0 && !config.playMode) {
-                updateStatus('⚠️ No valid codes remain - check your feedback!');
-                gameState.possibleCodes = [...gameState.allCodes];
-                for (const g of gameState.guesses) {
-                    if (g.feedback) {
-                        gameState.possibleCodes = filterCodes(gameState.possibleCodes, g.guess, g.feedback);
-                    }
-                }
             }
 
             gameState.currentGuess = new Array(config.numSlots).fill(null);
             gameState.activeSlot = 0;
             renderCurrentGuess();
             updateSubmitButton();
-            
+
             const remaining = config.numGuesses - gameState.guesses.length;
-            const possibleMsg = !config.playMode ? ` | ${gameState.possibleCodes.length} possibilities` : '';
+            const possibleMsg = !config.playMode ? ` | ${gameState.possibleCodes.length.toLocaleString()} possibilities` : '';
             updateStatus(`${remaining} attempt${remaining !== 1 ? 's' : ''} remaining${possibleMsg}`);
         }
 
@@ -1084,62 +1131,76 @@
 
             const hintBtn = document.getElementById('hintBtn');
             hintBtn.disabled = true;
-            hintBtn.textContent = '🧠 Thinking...';
+            hintBtn.textContent = '💡 Thinking...';
 
             setTimeout(() => {
                 const bestGuess = findBestGuess();
                 applyHint(bestGuess);
-                hintBtn.disabled = false;
-                hintBtn.textContent = '🧠 Hint';
+                hintBtn.disabled = gameState.gameOver || gameState.waitingForFeedback;
+                hintBtn.textContent = '💡 Hint';
             }, 50);
         }
 
+        // Evenly-spaced sample of at most `max` items (keeps runtime bounded for big code spaces).
+        function sampleEvenly(arr, max) {
+            if (arr.length <= max) return arr;
+            const out = [];
+            const step = arr.length / max;
+            for (let i = 0; i < max; i++) {
+                out.push(arr[Math.floor(i * step)]);
+            }
+            return out;
+        }
+
+        // Knuth-style minimax: pick the guess that minimizes the worst-case number
+        // of remaining possibilities, preferring guesses that could be the answer.
         function findBestGuess() {
             const possible = gameState.possibleCodes;
-
-            if (possible.length === 1) {
-                return possible[0];
-            }
-
-            if (possible.length === 2) {
-                return possible[0];
-            }
-
-            if (gameState.guesses.length === 0 && config.numSlots === 4 && config.numSymbols >= 4) {
-                return [0, 0, 1, 1];
-            }
 
             if (possible.length <= 2) {
                 return possible[0];
             }
 
+            // Standard opening: AABB for 4 slots, generalized for other lengths.
+            if (gameState.guesses.length === 0) {
+                const half = Math.ceil(config.numSlots / 2);
+                const first = [];
+                for (let i = 0; i < config.numSlots; i++) {
+                    first.push(i < half ? 0 : 1);
+                }
+                return first;
+            }
+
+            const evalSet = sampleEvenly(possible, 1500);
+
+            let candidates;
+            let candidatesArePossible = false;
+            if (gameState.allCodes.length <= 1296) {
+                candidates = gameState.allCodes;
+            } else {
+                candidates = sampleEvenly(possible, 60);
+                candidatesArePossible = true;
+            }
+
+            const possibleKeys = candidatesArePossible ? null : new Set(possible.map(c => c.join(',')));
+            const width = config.numSlots + 1;
+
             let bestGuess = null;
             let bestScore = Infinity;
 
-            let candidates = possible;
-            if (candidates.length > 50) {
-                candidates = possible.slice(0, 50);
-            }
-
-            if (possible.length > 10 && gameState.allCodes.length <= 1296) {
-                const extra = gameState.allCodes
-                    .filter(c => !possible.some(p => arraysEqual(p, c)))
-                    .slice(0, 20);
-                candidates = [...candidates, ...extra];
-            }
-
             for (const guess of candidates) {
-                const feedbackCounts = {};
-                
-                for (const code of possible) {
+                const counts = new Array(width * width).fill(0);
+                let worstCase = 0;
+
+                for (const code of evalSet) {
                     const fb = calculateFeedback(guess, code);
-                    const key = `${fb.exact},${fb.partial}`;
-                    feedbackCounts[key] = (feedbackCounts[key] || 0) + 1;
+                    const idx = fb.exact * width + fb.partial;
+                    counts[idx]++;
+                    if (counts[idx] > worstCase) worstCase = counts[idx];
                 }
 
-                const worstCase = Math.max(...Object.values(feedbackCounts));
-                const isPossible = possible.some(p => arraysEqual(p, guess));
-                const score = worstCase * 1000 + (isPossible ? 0 : 1);
+                const isPossible = candidatesArePossible || possibleKeys.has(guess.join(','));
+                const score = worstCase * 2 + (isPossible ? 0 : 1);
 
                 if (score < bestScore) {
                     bestScore = score;
@@ -1148,14 +1209,6 @@
             }
 
             return bestGuess || possible[0];
-        }
-
-        function arraysEqual(a, b) {
-            if (a.length !== b.length) return false;
-            for (let i = 0; i < a.length; i++) {
-                if (a[i] !== b[i]) return false;
-            }
-            return true;
         }
 
         function applyHint(guess) {
@@ -1177,10 +1230,10 @@
         function showHintInfo(guess) {
             const hintInfo = document.getElementById('hintInfo');
             const hintStats = document.getElementById('hintStats');
-            
+
             const symbolNames = guess.map(s => SYMBOLS[s].name).join(', ');
             const possibleCount = gameState.possibleCodes.length;
-            
+
             let message = `Suggested: ${symbolNames}`;
             if (possibleCount > 1) {
                 message += ` | ${possibleCount.toLocaleString()} possible codes`;
@@ -1202,7 +1255,7 @@
 
             for (let i = gameState.guesses.length - 1; i >= 0; i--) {
                 const { guess, feedback } = gameState.guesses[i];
-                
+
                 const row = document.createElement('div');
                 row.className = 'guess-row';
 
@@ -1213,7 +1266,7 @@
 
                 const symbolsDiv = document.createElement('div');
                 symbolsDiv.className = 'guess-symbols';
-                
+
                 for (const symbolIndex of guess) {
                     const symbolDiv = document.createElement('div');
                     symbolDiv.className = 'guess-symbol';
@@ -1224,7 +1277,7 @@
 
                 const feedbackDiv = document.createElement('div');
                 feedbackDiv.className = 'feedback';
-                
+
                 if (feedback) {
                     for (let j = 0; j < feedback.exact; j++) {
                         const peg = document.createElement('div');
@@ -1245,7 +1298,7 @@
                 } else {
                     feedbackDiv.innerHTML = '<span style="opacity: 0.5; font-size: 0.8rem;">awaiting...</span>';
                 }
-                
+
                 row.appendChild(feedbackDiv);
                 guessesDiv.appendChild(row);
             }
