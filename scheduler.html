@@ -195,18 +195,112 @@ html.lock, html.lock body { overflow: hidden; }
 }
 .ta::placeholder { color: var(--muted); }
 
+/* Wide screen with a mouse: timeline on the left, note panel on the right. */
+.panel, .edge, .slothover, .toast { display: none; }
+@media (min-width: 700px) and (pointer: coarse) {
+  .wrap { max-width: 640px; margin-inline: auto; }
+}
+@media (min-width: 940px) and (hover: hover) and (pointer: fine) {
+  .app {
+    display: flex; align-items: flex-start; justify-content: center; gap: 40px;
+    max-width: 1080px; margin-inline: auto; padding-inline: 24px; box-sizing: border-box;
+  }
+  .wrap { flex: 1 1 0; min-width: 0; max-width: 640px; padding-inline: 0; padding-block: 36px 160px; }
+  .editor { display: none !important; }
+  .hint, .grip, .kill, .chip { display: none !important; }
+  .note { cursor: grab; touch-action: none; }
+  .note.dragging { cursor: grabbing; }
+  .note:hover .bubble { background: var(--surface-2); border-color: var(--line-hour); }
+  .note.selected { z-index: 5; }
+  .note.selected .bubble { background: var(--surface-2); border-color: var(--accent); }
+  .edge { display: block; position: absolute; left: 0; right: 0; height: 7px; z-index: 5; cursor: ns-resize; }
+  .edge.top { top: 0; }
+  .edge.bot { bottom: 0; }
+  .edge::after {
+    content: ""; position: absolute; left: 14px; right: 14px; height: 2px; border-radius: 2px;
+    background: var(--accent); opacity: 0; transition: opacity .12s;
+  }
+  .edge.top::after { top: 2px; }
+  .edge.bot::after { bottom: 2px; }
+  .note.selected .edge::after { opacity: .45; }
+  .edge:hover::after { opacity: 1; }
+  .slothover {
+    display: flex; align-items: center; position: absolute; left: 0; right: 0; z-index: 1;
+    margin-block: 1px; height: calc(var(--H) - 2px); padding-left: 12px; box-sizing: border-box;
+    font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
+    background: var(--surface); border-radius: 8px; pointer-events: none;
+  }
+  .panel {
+    display: block; flex: none; width: 360px; position: sticky; top: 0;
+    height: 100vh; height: 100dvh; box-sizing: border-box; padding-block: 36px 76px;
+  }
+  .p-card {
+    height: 100%; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden;
+    background: var(--surface); border: 1px solid var(--line-note); border-radius: 12px;
+  }
+  .p-empty { margin: auto; padding: 24px; text-align: center; }
+  .p-empty b { display: block; font-weight: 500; font-size: 15px; color: var(--muted); }
+  .p-empty small { display: block; margin: 10px auto 0; max-width: 27ch; font-size: 13px; line-height: 1.6; color: var(--muted); }
+  .p-note { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .p-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 20px; border-bottom: 1px solid var(--line-note); }
+  .p-time {
+    flex: 1; min-width: 0; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .p-head .iconbtn { min-width: 36px; height: 36px; color: var(--muted); }
+  .p-head .iconbtn:hover { color: var(--fg); background: var(--surface-2); }
+  .p-ta {
+    flex: 1; min-height: 0; width: 100%; box-sizing: border-box; resize: none; border: 0; outline: 0;
+    background: transparent; color: var(--fg); font-family: var(--sans); font-size: 16px; line-height: 1.65;
+    padding: 18px 20px; caret-color: var(--accent);
+  }
+  .p-ta::placeholder { color: var(--muted); }
+  .toast {
+    display: flex; position: absolute; left: 0; bottom: 20px; align-items: center; gap: 10px;
+    padding: 6px 6px 6px 14px; border-radius: 10px; font-size: 13px;
+    background: var(--surface-2); border: 1px solid var(--line-hour);
+  }
+  .toast button {
+    font: inherit; color: var(--accent); background: none; border: 0; padding: 5px 9px;
+    border-radius: 6px; cursor: pointer;
+  }
+  .toast button:hover { background: var(--surface); }
+  .toast button:focus-visible { outline: 2px solid var(--accent); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .bubble { transition: none; }
 }
 </style>
 </head>
 <body>
-<div class="wrap" id="sched">
-  <div class="hours" id="hours" aria-hidden="true"></div>
-  <div class="grid" id="grid">
-    <div class="hint" id="hint" hidden>Tap any line to add a note</div>
-    <div class="nowline" id="nowline"></div>
+<div class="app">
+  <div class="wrap" id="sched">
+    <div class="hours" id="hours" aria-hidden="true"></div>
+    <div class="grid" id="grid">
+      <div class="hint" id="hint" hidden>Tap any line to add a note</div>
+      <div class="slothover" id="slothover" hidden></div>
+      <div class="nowline" id="nowline"></div>
+    </div>
   </div>
+  <aside class="panel" id="panel" aria-label="Note details">
+    <div class="p-card">
+      <div class="p-empty" id="pEmpty">
+        <b>No note selected</b>
+        <small>Click a line to add a note. Click and drag down to set how long it runs. Double-click a note to write in it. Press Delete to remove it.</small>
+      </div>
+      <div class="p-note" id="pNote" hidden>
+        <div class="p-head">
+          <div class="p-time" id="pMeta"></div>
+          <button class="iconbtn" id="pDel" type="button" aria-label="Delete note" title="Delete note">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3"/></svg>
+          </button>
+        </div>
+        <textarea class="p-ta" id="ptext" placeholder="Write something" aria-label="Note text"></textarea>
+      </div>
+    </div>
+    <div class="toast" id="toast" hidden><span id="toastMsg"></span><button type="button" id="toastUndo">Undo</button></div>
+  </aside>
 </div>
 
 <button class="nowbtn" id="nowbtn" type="button" hidden>Now</button>
@@ -238,6 +332,7 @@ html.lock, html.lock body { overflow: hidden; }
   var openId = null;          // note open in the text page
   var drag = null, pending = null, lastClientY = 0, raf = 0, suppressUntil = 0;
   var freshId = null, longFired = false;
+  var selId = null, lastDeleted = null, deskCreate = null, toastTimer = 0;
 
   /* ---------- time helpers ---------- */
   function pad(x) { return x < 10 ? '0' + x : '' + x; }
@@ -308,7 +403,8 @@ html.lock, html.lock body { overflow: hidden; }
       '<button class="kill" type="button" aria-label="Delete note">' +
       '<svg class="ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3"/></svg>' +
       '<span class="ask">Delete?</span></button>' +
-      '<i class="grip top" data-handle="top"></i><i class="grip bot" data-handle="bottom"></i>';
+      '<i class="grip top" data-handle="top"></i><i class="grip bot" data-handle="bottom"></i>' +
+      '<i class="edge top" data-handle="top"></i><i class="edge bot" data-handle="bottom"></i>';
     grid.appendChild(el);
     els.set(n.id, el);
     return el;
@@ -324,6 +420,7 @@ html.lock, html.lock body { overflow: hidden; }
     el.querySelector('.chip b').textContent = fmtTime(slotMin(n.s));
     el.querySelector('.chip span').textContent = fmtTime(slotMin(n.s + n.n));
     el.setAttribute('aria-label', (shown || 'Empty note') + ', ' + rangeLabel(n));
+    if (n.id === selId) pMeta.textContent = rangeLabel(n);
   }
   function renderAll() {
     els.forEach(function (el, id) {
@@ -331,6 +428,8 @@ html.lock, html.lock body { overflow: hidden; }
     });
     notes.forEach(paint);
     hint.hidden = notes.size > 0;
+    if (selId && !notes.has(selId)) deselect();
+    els.forEach(function (el, id) { el.classList.toggle('selected', id === selId); });
     if (editId && !notes.has(editId)) exitEdit();
   }
   function updateNow() {
@@ -342,7 +441,9 @@ html.lock, html.lock body { overflow: hidden; }
     updateNowBtn();
   }
   function updateNowBtn() {
-    var y = grid.getBoundingClientRect().top + nowSlotF() * H;
+    var gr = grid.getBoundingClientRect();
+    var y = gr.top + nowSlotF() * H;
+    nowBtn.style.right = isDesktop() ? Math.max(8, root.clientWidth - panel.getBoundingClientRect().right) + 'px' : '';
     nowBtn.hidden = !!openId || (y > 70 && y < window.innerHeight - 70);
   }
   function scrollToNow(smooth) {
@@ -475,6 +576,7 @@ html.lock, html.lock body { overflow: hidden; }
 
   grid.addEventListener('pointerdown', function (e) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (isDesktop()) { deskDown(e); return; }
     longFired = false;
     var el = e.target.closest('.note');
     if (el) {
@@ -500,6 +602,7 @@ html.lock, html.lock body { overflow: hidden; }
     startHold(e, { kind: 'create', slot: slot });
   });
   window.addEventListener('pointermove', function (e) {
+    if (deskCreate && e.pointerId === deskCreate.pid) { deskCreateMove(e); return; }
     if (drag && e.pointerId === drag.pid) {
       lastClientY = e.clientY;
       if (Math.abs(e.clientY - drag.y0) > 8) drag.travelled = true;
@@ -510,6 +613,7 @@ html.lock, html.lock body { overflow: hidden; }
     }
   });
   function onUp(e) {
+    if (deskCreate && e.pointerId === deskCreate.pid) deskCreateEnd(e);
     if (drag && e.pointerId === drag.pid) {
       var d = endDrag();
       // a real drag, or any press on a resize handle, must not also count as a tap
@@ -532,11 +636,12 @@ html.lock, html.lock body { overflow: hidden; }
   window.addEventListener('pointerup', onUp);
   window.addEventListener('pointercancel', onUp);
   window.addEventListener('touchmove', function (e) { if (drag) e.preventDefault(); }, { passive: false });
-  grid.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  grid.addEventListener('contextmenu', function (e) { if (!isDesktop()) e.preventDefault(); });
 
   /* ---------- tap handling ---------- */
   function newId() { return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
   sched.addEventListener('click', function (e) {
+    if (isDesktop()) return;
     if (Date.now() < suppressUntil) return;
     if (longFired) { longFired = false; return; }
     var kill = e.target.closest('.kill');
@@ -575,6 +680,7 @@ html.lock, html.lock body { overflow: hidden; }
     enterEdit(n.id);
   });
   grid.addEventListener('keydown', function (e) {
+    if (isDesktop()) return;
     if (e.key !== 'Enter' || e.target.closest('.kill')) return;
     var el = e.target.closest('.note');
     if (!el) return;
@@ -645,6 +751,199 @@ html.lock, html.lock body { overflow: hidden; }
     window.visualViewport.addEventListener('scroll', syncViewport);
   }
 
+  /* ---------- desktop: wide screen + mouse ---------- */
+  var mq = window.matchMedia('(min-width: 940px) and (hover: hover) and (pointer: fine)');
+  function isDesktop() { return mq.matches; }
+  var panel = $('panel'), pEmpty = $('pEmpty'), pNote = $('pNote'), pMeta = $('pMeta'), ptext = $('ptext'),
+      pDel = $('pDel'), toast = $('toast'), toastMsg = $('toastMsg'), toastUndo = $('toastUndo'),
+      hoverEl = $('slothover');
+
+  function slotAt(clientY) { return Math.floor((clientY - grid.getBoundingClientRect().top) / H); }
+  function rangeFree(s, len, ignoreId) {
+    if (s < 0 || len < 1 || s + len > SLOTS) return false;
+    var ok = true;
+    notes.forEach(function (o) { if (o.id !== ignoreId && s < o.s + o.n && o.s < s + len) ok = false; });
+    return ok;
+  }
+  function select(id, focusText) {
+    var n = notes.get(id);
+    if (!n) { deselect(); return; }
+    selId = id;
+    els.forEach(function (el, k) { el.classList.toggle('selected', k === id); });
+    pEmpty.hidden = true; pNote.hidden = false;
+    if (ptext.value !== n.t) ptext.value = n.t;
+    pMeta.textContent = rangeLabel(n);
+    if (focusText) {
+      try { ptext.focus({ preventScroll: true }); ptext.setSelectionRange(ptext.value.length, ptext.value.length); } catch (er) {}
+    }
+  }
+  function deselect() {
+    selId = null;
+    els.forEach(function (el) { el.classList.remove('selected'); });
+    pNote.hidden = true; pEmpty.hidden = false;
+    if (document.activeElement === ptext) ptext.blur();
+  }
+  function showToast(msg) {
+    toastMsg.textContent = msg; toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.hidden = true; }, 7000);
+  }
+  function deleteSelected() {
+    var n = notes.get(selId);
+    if (!n) return;
+    var id = selId;
+    lastDeleted = { id: n.id, s: n.s, n: n.n, t: n.t };
+    notes.delete(id);
+    deselect();
+    renderAll();
+    persist(id);
+    showToast('Note deleted');
+  }
+  toastUndo.addEventListener('click', function () {
+    var d = lastDeleted;
+    if (!d) return;
+    lastDeleted = null; toast.hidden = true; clearTimeout(toastTimer);
+    if (!rangeFree(d.s, d.n, null)) { showToast('That time is taken now'); return; }
+    notes.set(d.id, d);
+    renderAll();
+    persist(d.id);
+    select(d.id, false);
+  });
+  pDel.addEventListener('click', deleteSelected);
+  ptext.addEventListener('input', function () {
+    var n = notes.get(selId);
+    if (!n) return;
+    n.t = ptext.value;
+    paint(n);
+    persist(selId, 600);
+  });
+
+  function hideHover() { hoverEl.hidden = true; }
+  grid.addEventListener('pointermove', function (e) {
+    if (!isDesktop() || e.pointerType !== 'mouse' || drag || deskCreate || e.target.closest('.note')) { hideHover(); return; }
+    var sl = slotAt(e.clientY);
+    if (sl < 0 || sl >= SLOTS) { hideHover(); return; }
+    hoverEl.style.top = (sl * H) + 'px';
+    hoverEl.textContent = fmtTime(slotMin(sl), true);
+    hoverEl.hidden = false;
+  });
+  grid.addEventListener('pointerleave', hideHover);
+
+  // press on a note: select it, then move it (body) or stretch it (top and bottom edges).
+  // press on empty time: click to add a one-slot note, or drag down/up to set its length.
+  function deskDown(e) {
+    if (e.button !== 0) return;
+    if (document.activeElement === ptext) ptext.blur();
+    var el = e.target.closest('.note');
+    if (el) {
+      var n = notes.get(el.dataset.id);
+      if (!n) return;
+      select(n.id, false);
+      var edge = e.target.closest('.edge');
+      beginDrag(e.clientY, e.pointerId, n, el, edge ? edge.dataset.handle : 'move');
+      e.preventDefault();
+      return;
+    }
+    var gr = grid.getBoundingClientRect();
+    if (e.clientX < gr.left || e.clientX > gr.right) return;
+    var slot = Math.floor((e.clientY - gr.top) / H);
+    if (slot < 0 || slot >= SLOTS) return;
+    var lo = 0, hi = SLOTS;
+    notes.forEach(function (o) {
+      if (o.s + o.n <= slot) lo = Math.max(lo, o.s + o.n);
+      if (o.s > slot) hi = Math.min(hi, o.s);
+    });
+    deskCreate = { slot0: slot, pid: e.pointerId, y0: e.clientY, lo: lo, hi: hi, id: null, started: false };
+    try { grid.setPointerCapture(e.pointerId); } catch (er) {}
+    hideHover();
+    e.preventDefault();
+  }
+  function deskCreateMove(e) {
+    var d = deskCreate;
+    if (!d.started) {
+      if (Math.abs(e.clientY - d.y0) < 5) return;
+      d.started = true;
+      var nn = { id: newId(), s: d.slot0, n: 1, t: '' };
+      notes.set(nn.id, nn);
+      d.id = nn.id;
+      renderAll();
+      select(nn.id, false);
+    }
+    var n = notes.get(d.id);
+    if (!n) return;
+    var t = Math.max(0, Math.min(SLOTS - 1, slotAt(e.clientY)));
+    var a = Math.max(Math.min(d.slot0, t), d.lo), b = Math.min(Math.max(d.slot0, t), d.hi - 1);
+    n.s = a; n.n = b - a + 1;
+    paint(n);
+  }
+  function deskCreateEnd(e) {
+    var d = deskCreate; deskCreate = null;
+    try { grid.releasePointerCapture(d.pid); } catch (er) {}
+    if (e.type === 'pointercancel') {
+      if (d.id) { notes.delete(d.id); renderAll(); persist(d.id); }
+      return;
+    }
+    if (!d.started) {
+      var nn = { id: newId(), s: d.slot0, n: 1, t: '' };
+      notes.set(nn.id, nn);
+      d.id = nn.id;
+      renderAll();
+    }
+    persist(d.id);
+    select(d.id, true);
+  }
+
+  grid.addEventListener('dblclick', function (e) {
+    if (!isDesktop()) return;
+    var el = e.target.closest('.note');
+    if (el) select(el.dataset.id, true);
+  });
+  grid.addEventListener('focusin', function (e) {
+    if (!isDesktop()) return;
+    var el = e.target.closest && e.target.closest('.note');
+    if (el && el.dataset.id !== selId) select(el.dataset.id, false);
+  });
+  document.addEventListener('click', function (e) {
+    if (!isDesktop() || !selId) return;
+    if (e.target.closest('#grid, #panel, .nowbtn')) return;
+    deselect();
+  });
+
+  function nudge(dir, resize) {
+    var n = notes.get(selId);
+    if (!n) return;
+    var s = n.s, len = n.n;
+    if (resize) len += dir; else s += dir;
+    if (!rangeFree(s, len, n.id)) return;
+    n.s = s; n.n = len;
+    paint(n);
+    persist(n.id);
+    var r = els.get(n.id).getBoundingClientRect();
+    if (r.top < 60) window.scrollBy(0, r.top - 120);
+    else if (r.bottom > window.innerHeight - 60) window.scrollBy(0, r.bottom - window.innerHeight + 120);
+  }
+  window.addEventListener('keydown', function (e) {
+    if (!isDesktop()) return;
+    var ae = document.activeElement;
+    if (e.key === 'Escape') { if (ae === ptext) ptext.blur(); else deselect(); return; }
+    if (!selId || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (ae && ae !== document.body && !(ae.closest && ae.closest('.note'))) return; // typing, or on another control
+    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); }
+    else if (e.key === 'Enter') { e.preventDefault(); select(selId, true); }
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); nudge(e.key === 'ArrowDown' ? 1 : -1, e.shiftKey); }
+  });
+
+  function onModeChange() {
+    exitEdit();
+    if (openId) closeEditor(false);
+    deselect();
+    hideHover();
+    renderAll();
+    updateNow();
+  }
+  if (mq.addEventListener) mq.addEventListener('change', onModeChange);
+  else if (mq.addListener) mq.addListener(onModeChange);
+
   /* ---------- boot ---------- */
   var scrollTick = 0;
   window.addEventListener('scroll', function () {
@@ -656,7 +955,7 @@ html.lock, html.lock body { overflow: hidden; }
 
   try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (e) {}
   window.addEventListener('storage', function (e) {
-    if (e.key !== LS_KEY || drag || openId) return;
+    if (e.key !== LS_KEY || drag || deskCreate || openId || document.activeElement === ptext) return;
     loadLocal();
     renderAll();
   });
