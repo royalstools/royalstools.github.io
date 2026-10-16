@@ -1,0 +1,628 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Dusk Notes</title>
+<style>
+/* Layout: one full-screen dark board. Post-its float on it. The round + button (bottom right) adds a note, turns into a trash can while a note is carried, and a tap on a note grows it into a full-screen text page. */
+:root {
+  --bg: #0e1013;
+  --ink: #ece6d8;
+  --ink-dim: rgba(236, 230, 216, 0.55);
+  --ink-faint: rgba(236, 230, 216, 0.3);
+  --accent: #e6c981;
+  --on-accent: #17140d;
+  --danger: #e4806f;
+  --font: "Google Sans Text", "Google Sans", "Avenir Next", "Segoe UI Variable Text", "SF Pro Text", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#board { position: relative; width: 100%; height: 100%; overflow: hidden; --s: 150px; }
+
+#hint {
+  position: absolute; left: 0; right: 0; top: 50%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: 15px; letter-spacing: 0.02em;
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+
+/* ---------- post-it ---------- */
+.note {
+  position: absolute; left: 0; top: 0;
+  width: var(--s); height: var(--s);
+  --f: calc(var(--s) * 0.12);
+  transform: translate3d(var(--x, 0px), var(--y, 0px), 0) rotate(var(--r, 0deg));
+  touch-action: none;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  cursor: grab;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 10px 14px rgba(0, 0, 0, 0.38));
+  transition: filter 0.2s ease;
+}
+.note.sink { transition: transform 0.26s cubic-bezier(0.5, 0, 0.9, 0.5), filter 0.2s ease; }
+.note.lift {
+  cursor: grabbing;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4)) drop-shadow(0 20px 22px rgba(0, 0, 0, 0.5));
+}
+.note:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+.paper {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, var(--c2) 0%, var(--c1) 100%);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--f)), calc(100% - var(--f)) 100%, 0 100%);
+  padding: calc(var(--s) * 0.15) calc(var(--s) * 0.1) calc(var(--s) * 0.12);
+  box-sizing: border-box;
+  transform-origin: 50% 50%;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
+}
+.paper::before {            /* adhesive strip */
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 9%;
+  background: rgba(255, 255, 255, 0.05);
+}
+.paper::after {             /* folded corner */
+  content: ""; position: absolute; right: 0; bottom: 0; width: var(--f); height: var(--f);
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.32) 50%, transparent 50%);
+}
+.txt {
+  font-size: calc(var(--s) * 0.088);
+  line-height: 1.38;
+  color: #ece6d8;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; overflow: hidden;
+}
+.note.lift .paper { transform: scale(1.06); }
+.note.over .paper { transform: scale(0.62); opacity: 0.7; }
+.note.sink .paper { transform: scale(0.1); opacity: 0; }
+.note.enter .paper { animation: pop 0.32s cubic-bezier(0.2, 0.9, 0.25, 1.2); }
+@keyframes pop { from { transform: scale(0.5); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---------- + / trash button ---------- */
+#fab {
+  position: fixed; right: 20px; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 60px; height: 60px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--accent); color: var(--on-accent);
+  display: grid; place-items: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  cursor: pointer; z-index: 1000000;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.2s ease;
+}
+#fab svg { grid-area: 1 / 1; width: 26px; height: 26px; transition: transform 0.25s ease, opacity 0.2s ease; }
+#fab .ico-trash { opacity: 0; transform: scale(0.6) rotate(-20deg); }
+#fab:active { transform: scale(0.94); }
+#fab:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+body.carrying #fab { transform: scale(1.08); }
+body.carrying #fab .ico-plus { opacity: 0; transform: rotate(90deg) scale(0.6); }
+body.carrying #fab .ico-trash { opacity: 1; transform: none; }
+#fab.hot { background: var(--danger); transform: scale(1.28); }
+body.padopen #fab { opacity: 0; pointer-events: none; }
+
+/* ---------- toast ---------- */
+#toast {
+  position: fixed; left: 16px; bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  max-width: calc(100% - 112px);
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 8px 12px 16px;
+  background: #23262b; color: var(--ink);
+  border-radius: 12px; font-size: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 1500000;
+}
+#toast button {
+  background: none; border: 0; color: var(--accent);
+  font: inherit; font-weight: 600; padding: 6px 10px; cursor: pointer; border-radius: 8px;
+}
+#toast button:focus-visible { outline: 2px solid var(--accent); }
+
+/* ---------- notepad page ---------- */
+#pad {
+  position: fixed; left: 0; top: 0; width: 100%; height: var(--vvh, 100%);
+  background: var(--pad-bg, #23262b);
+  z-index: 2000000; overflow: hidden;
+  transition: clip-path 0.36s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+#pad.closing { height: 100%; }
+#pad .pad-ui { position: absolute; inset: 0; opacity: 0; transition: opacity 0.22s ease; }
+#pad.shown .pad-ui { opacity: 1; transition-delay: 0.12s; }
+#pad.closing .pad-ui { transition-delay: 0s; }
+#back {
+  position: absolute; z-index: 1;
+  right: 20px; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 60px; height: 60px; padding: 0; border: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1); color: var(--ink);
+  display: grid; place-items: center; cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.2s ease;
+}
+#back:active { transform: scale(0.94); background: rgba(255, 255, 255, 0.16); }
+#back:focus-visible { outline: 2px solid var(--accent); }
+#back svg { width: 26px; height: 26px; }
+#text {
+  display: block; width: 100%; height: 100%; box-sizing: border-box;
+  border: 0; outline: 0; resize: none; background: transparent;
+  color: #efe9dc; caret-color: var(--accent);
+  font-family: var(--font); font-size: 18px; line-height: 1.65; letter-spacing: 0.005em;
+  padding-top: calc(40px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
+  padding-inline: max(24px, calc((100% - 640px) / 2));
+}
+#text::placeholder { color: var(--ink-faint); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+</style>
+
+<div id="board">
+  <div id="hint" hidden>Tap + to add a note</div>
+</div>
+
+<button id="fab" type="button" aria-label="New note">
+  <svg class="ico-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  <svg class="ico-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
+</button>
+
+<div id="toast" role="status" aria-live="polite" hidden><span id="toast-msg"></span><button id="toast-act" type="button" hidden>Undo</button></div>
+
+<div id="pad" hidden>
+  <div class="pad-ui">
+    <button id="back" type="button" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+    <textarea id="text" placeholder="Write something" aria-label="Note text" autocapitalize="sentences"></textarea>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var PALETTE = [
+    { c2: '#4d4227', c1: '#433922' }, // amber
+    { c2: '#324439', c1: '#2c3c32' }, // sage
+    { c2: '#314052', c1: '#2b3849' }, // slate
+    { c2: '#4f323b', c1: '#432b33' }, // rose
+    { c2: '#413657', c1: '#382f4b' }  // plum
+  ];
+  var LS_KEY = 'dusk-notes-v1';
+
+  var board = document.getElementById('board');
+  var fab = document.getElementById('fab');
+  var hint = document.getElementById('hint');
+  var pad = document.getElementById('pad');
+  var ta = document.getElementById('text');
+  var backBtn = document.getElementById('back');
+  var toast = document.getElementById('toast');
+  var toastMsg = document.getElementById('toast-msg');
+  var toastAct = document.getElementById('toast-act');
+
+  var notes = new Map();
+  var W = 360, H = 640, S = 150;
+  var zTop = 0;
+  var loaded = false;
+  var mode = 'pending';           // 'pending' | 'db' | 'local'
+  var col = null;
+  var selfDeleted = new Set();
+  var dragging = null;
+  var openId = null, padNote = null, pushed = false;
+  var saveTimer = null, toastTimer = null, lastColor = -1;
+
+  function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function newId() {
+    try { if (window.crypto && crypto.randomUUID) return 'n' + crypto.randomUUID().replace(/-/g, ''); } catch (e) {}
+    return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  /* ---------- metrics ---------- */
+  function metrics() {
+    W = board.clientWidth || window.innerWidth || 360;
+    H = board.clientHeight || window.innerHeight || 640;
+    S = Math.round(clamp(Math.min(W, H) * 0.38, 120, 168));
+    board.style.setProperty('--s', S + 'px');
+  }
+  function place(n) {
+    n.el.style.setProperty('--x', (n.nx * W - S / 2) + 'px');
+    n.el.style.setProperty('--y', (n.ny * H - S / 2) + 'px');
+    n.el.style.setProperty('--r', n.r + 'deg');
+  }
+
+  /* ---------- storage ---------- */
+  function ser(n) { return { id: n.id, text: n.text, nx: n.nx, ny: n.ny, r: n.r, c: n.c, z: n.z, u: n.u }; }
+  function lsRead() {
+    try { var a = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+  }
+  function lsWrite() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(Array.from(notes.values()).map(ser))); } catch (e) {}
+  }
+  function clean(id, d) {
+    var num = function (v, f) { return typeof v === 'number' && isFinite(v) ? v : f; };
+    var len = PALETTE.length;
+    return {
+      id: id,
+      text: typeof d.text === 'string' ? d.text.slice(0, 50000) : '',
+      nx: clamp(num(d.nx, 0.5), 0.04, 0.96),
+      ny: clamp(num(d.ny, 0.5), 0.04, 0.96),
+      r: clamp(num(d.r, 0), -6, 6),
+      c: (((num(d.c, 0) | 0) % len) + len) % len,
+      z: num(d.z, 0),
+      u: num(d.u, 0)
+    };
+  }
+
+  var chains = new Map();
+  function enqueue(id, kind) {
+    var p = (chains.get(id) || Promise.resolve())
+      .then(function () { return run(id, kind); })
+      .catch(function () {});
+    chains.set(id, p);
+  }
+  function run(id, kind) {
+    if (!col) return Promise.resolve();
+    var ref = col.doc(id);
+    if (kind === 'del') return withRetry(function () { return ref.delete(); });
+    var n = notes.get(id);
+    if (!n) return Promise.resolve();
+    return withRetry(function () { return ref.set(ser(n)); });
+  }
+  function withRetry(fn) {
+    return fn().catch(function (e) {
+      if (e && e.code === 'unavailable') {
+        return sleep(400 + Math.random() * 400).then(fn).catch(saveFailed);
+      }
+      saveFailed(e);
+    });
+  }
+  function saveFailed(e) {
+    if (e && e.code === 'invalid_argument') {
+      mode = 'local'; lsWrite();
+      say('Saving on this device only');
+    } else {
+      say("Couldn't save. Check your connection.");
+    }
+  }
+  function persist(n) {
+    n.u = Date.now();
+    if (mode === 'local') lsWrite();
+    else if (mode === 'db') enqueue(n.id, 'set');
+  }
+
+  /* ---------- note elements ---------- */
+  function mount(n, animate) {
+    var el = document.createElement('div');
+    el.className = 'note' + (animate ? ' enter' : '');
+    el.dataset.id = n.id;
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
+    var paper = document.createElement('div'); paper.className = 'paper';
+    var txt = document.createElement('div'); txt.className = 'txt';
+    paper.appendChild(txt); el.appendChild(paper); board.appendChild(el);
+    n.el = el; n.txt = txt; n.paper = paper;
+    if (animate) setTimeout(function () { el.classList.remove('enter'); }, 400);
+    refresh(n);
+    return el;
+  }
+  function refresh(n) {
+    n.txt.textContent = n.text;
+    var first = n.text.split('\n').filter(function (l) { return l.trim(); })[0] || 'empty';
+    n.el.setAttribute('aria-label', 'Note: ' + first.slice(0, 60));
+    var p = PALETTE[n.c];
+    n.paper.style.setProperty('--c1', p.c1);
+    n.paper.style.setProperty('--c2', p.c2);
+    n.el.style.zIndex = n.z;
+    place(n);
+  }
+  function bringFront(n) { n.z = ++zTop; n.el.style.zIndex = n.z; }
+  function updateHint() { hint.hidden = !(loaded && notes.size === 0); }
+
+  function upsert(id, d) {
+    var n = clean(id, d);
+    var cur = notes.get(id);
+    if (cur) {
+      if ((dragging && dragging.n === cur) || openId === id) return;
+      if (cur.u >= n.u) return;
+      cur.text = n.text; cur.nx = n.nx; cur.ny = n.ny; cur.r = n.r; cur.c = n.c; cur.z = n.z; cur.u = n.u;
+      refresh(cur);
+    } else {
+      notes.set(id, n);
+      mount(n, false);
+    }
+    zTop = Math.max(zTop, n.z);
+    updateHint();
+  }
+
+  /* ---------- create / delete ---------- */
+  function createNote() {
+    var nx = 0.5, ny = 0.5, tries = 0;
+    function taken() {
+      var hit = false;
+      notes.forEach(function (o) { if (Math.abs(o.nx - nx) * W < 8 && Math.abs(o.ny - ny) * H < 8) hit = true; });
+      return hit;
+    }
+    while (tries < 10 && taken()) { nx += 14 / W; ny += 14 / H; tries++; }
+    var c;
+    do { c = Math.floor(Math.random() * PALETTE.length); } while (c === lastColor && PALETTE.length > 1);
+    lastColor = c;
+    var n = { id: newId(), text: '', nx: nx, ny: ny, r: Math.round((Math.random() * 6 - 3) * 10) / 10, c: c, z: ++zTop, u: Date.now() };
+    notes.set(n.id, n);
+    mount(n, true);
+    persist(n);
+    updateHint();
+  }
+
+  function deleteNote(n, tx, ty) {
+    notes.delete(n.id);
+    selfDeleted.add(n.id);
+    var el = n.el;
+    el.classList.add('sink');
+    el.style.setProperty('--x', (tx - S / 2) + 'px');
+    el.style.setProperty('--y', (ty - S / 2) + 'px');
+    setTimeout(function () { el.remove(); }, 280);
+    if (mode === 'local') lsWrite(); else if (mode === 'db') enqueue(n.id, 'del');
+    updateHint();
+    say('Note deleted', 'Undo', function () {
+      selfDeleted.delete(n.id);
+      notes.set(n.id, n);
+      mount(n, true);
+      persist(n);
+      updateHint();
+    });
+  }
+
+  /* ---------- toast ---------- */
+  function say(msg, actLabel, fn) {
+    clearTimeout(toastTimer);
+    toastMsg.textContent = msg;
+    toast.hidden = false;
+    if (actLabel && fn) {
+      toastAct.textContent = actLabel; toastAct.hidden = false;
+      toastAct.onclick = function () { toast.hidden = true; clearTimeout(toastTimer); fn(); };
+    } else {
+      toastAct.hidden = true; toastAct.onclick = null;
+    }
+    toastTimer = setTimeout(function () { toast.hidden = true; }, 5000);
+  }
+
+  /* ---------- dragging ---------- */
+  board.addEventListener('pointerdown', function (e) {
+    if (e.button > 0 || dragging || openId) return;
+    var el = e.target.closest('.note');
+    if (!el) return;
+    var n = notes.get(el.dataset.id);
+    if (!n) return;
+    var br = board.getBoundingClientRect();
+    var fr = fab.getBoundingClientRect();
+    dragging = {
+      n: n, id: e.pointerId, sx: e.clientX, sy: e.clientY,
+      cx: n.nx * W, cy: n.ny * H, px: n.nx * W, py: n.ny * H,
+      moved: false, hot: false,
+      bl: br.left, bt: br.top,
+      fx: fr.left + fr.width / 2, fy: fr.top + fr.height / 2
+    };
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+
+  board.addEventListener('pointermove', function (e) {
+    var d = dragging;
+    if (!d || e.pointerId !== d.id) return;
+    var dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+    if (!d.moved) {
+      if (Math.hypot(dx, dy) < 7) return;
+      d.moved = true;
+      d.n.el.classList.add('lift');
+      document.body.classList.add('carrying');
+      bringFront(d.n);
+    }
+    d.px = clamp(d.cx + dx, S * 0.3, W - S * 0.3);
+    d.py = clamp(d.cy + dy, S * 0.3, H - S * 0.3);
+    d.n.el.style.setProperty('--x', (d.px - S / 2) + 'px');
+    d.n.el.style.setProperty('--y', (d.py - S / 2) + 'px');
+    var hot = Math.hypot(e.clientX - d.fx, e.clientY - d.fy) < 64;
+    if (hot !== d.hot) {
+      d.hot = hot;
+      fab.classList.toggle('hot', hot);
+      d.n.el.classList.toggle('over', hot);
+    }
+  });
+
+  function endDrag(e, cancelled) {
+    var d = dragging;
+    if (!d || e.pointerId !== d.id) return;
+    dragging = null;
+    var n = d.n;
+    try { n.el.releasePointerCapture(e.pointerId); } catch (_) {}
+    n.el.classList.remove('lift', 'over');
+    document.body.classList.remove('carrying');
+    fab.classList.remove('hot');
+    if (!d.moved) { if (!cancelled) openPad(n); return; }
+    if (d.hot && !cancelled) { deleteNote(n, d.fx - d.bl, d.fy - d.bt); return; }
+    n.nx = d.px / W; n.ny = d.py / H;
+    persist(n);
+  }
+  board.addEventListener('pointerup', function (e) { endDrag(e, false); });
+  board.addEventListener('pointercancel', function (e) { endDrag(e, true); });
+  board.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  board.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var el = e.target.closest && e.target.closest('.note');
+    if (!el) return;
+    e.preventDefault();
+    var n = notes.get(el.dataset.id);
+    if (n) openPad(n);
+  });
+
+  fab.addEventListener('click', createNote);
+
+  /* ---------- notepad page ---------- */
+  function clipFor(r, pw, ph) {
+    return 'inset(' + Math.max(0, r.top) + 'px ' + Math.max(0, pw - r.right) + 'px ' + Math.max(0, ph - r.bottom) + 'px ' + Math.max(0, r.left) + 'px round 6px)';
+  }
+
+  function openPad(n) {
+    if (openId) return;
+    openId = n.id; padNote = n;
+    ta.value = n.text;
+    var r = n.el.getBoundingClientRect();
+    var pw = window.innerWidth, ph = window.innerHeight;
+    pad.style.setProperty('--pad-bg', PALETTE[n.c].c1);
+    pad.style.top = '0px';
+    pad.classList.remove('shown', 'closing');
+    pad.hidden = false;
+    pad.style.transition = 'none';
+    pad.style.clipPath = clipFor(r, pw, ph);
+    void pad.offsetWidth;
+    pad.style.transition = '';
+    pad.style.clipPath = 'inset(0px 0px 0px 0px round 0px)';
+    pad.classList.add('shown');
+    document.body.classList.add('padopen');
+    n.el.style.visibility = 'hidden';
+    try { history.pushState({ pad: n.id }, ''); pushed = true; } catch (_) { pushed = false; }
+    setTimeout(function () {
+      if (openId !== n.id) return;
+      try { ta.focus({ preventScroll: true }); var l = ta.value.length; ta.setSelectionRange(l, l); } catch (_) {}
+    }, 340);
+  }
+
+  function commitText() {
+    var n = padNote;
+    if (!n) return;
+    if (n.text !== ta.value) { n.text = ta.value; n.txt.textContent = n.text; }
+    persist(n);
+  }
+
+  function closePad() {
+    if (!openId) return;
+    var n = padNote;
+    clearTimeout(saveTimer);
+    commitText();
+    refresh(n);
+    ta.blur();
+    openId = null; padNote = null; pushed = false;
+    var r = n.el.getBoundingClientRect();
+    var pw = window.innerWidth, ph = window.innerHeight;
+    pad.classList.add('closing');
+    pad.classList.remove('shown');
+    pad.style.top = '0px';
+    pad.style.clipPath = clipFor(r, pw, ph);
+    setTimeout(function () {
+      if (openId) return;
+      pad.hidden = true;
+      pad.classList.remove('closing');
+      n.el.style.visibility = '';
+      document.body.classList.remove('padopen');
+    }, 380);
+  }
+
+  function requestClose() {
+    if (!openId) return;
+    if (pushed) {
+      try { history.back(); } catch (_) { closePad(); return; }
+      setTimeout(function () { if (openId) closePad(); }, 350);
+    } else {
+      closePad();
+    }
+  }
+
+  window.addEventListener('popstate', function () { if (openId) { pushed = false; closePad(); } });
+  backBtn.addEventListener('click', requestClose);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && openId) requestClose(); });
+
+  ta.addEventListener('input', function () {
+    var n = padNote;
+    if (!n) return;
+    n.text = ta.value;
+    n.txt.textContent = n.text;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { persist(n); }, 700);
+  });
+
+  function flushNow() { if (openId) { clearTimeout(saveTimer); commitText(); } }
+  document.addEventListener('visibilitychange', function () { if (document.hidden) flushNow(); });
+  window.addEventListener('pagehide', flushNow);
+
+  if (window.visualViewport) {
+    var vv = window.visualViewport;
+    var syncVv = function () {
+      if (!openId) return;
+      pad.style.setProperty('--vvh', vv.height + 'px');
+      pad.style.top = vv.offsetTop + 'px';
+    };
+    vv.addEventListener('resize', syncVv);
+    vv.addEventListener('scroll', syncVv);
+  }
+
+  window.addEventListener('resize', function () {
+    metrics();
+    notes.forEach(function (n) { place(n); });
+  });
+
+  /* ---------- load ---------- */
+  var firstSnap = true;
+  function onSnap(snap) {
+    var remoteIds = new Set();
+    snap.docChanges().forEach(function (ch) {
+      var id = ch.doc.id;
+      if (ch.type === 'removed') {
+        if (selfDeleted.has(id)) { selfDeleted.delete(id); return; }
+        var cur = notes.get(id);
+        if (cur && !(dragging && dragging.n === cur) && openId !== id) {
+          cur.el.remove(); notes.delete(id);
+        }
+        return;
+      }
+      if (ch.doc.metadata.hasPendingWrites) return;
+      var d = ch.doc.data();
+      if (d) upsert(id, d);
+    });
+    snap.docs.forEach(function (doc) { remoteIds.add(doc.id); });
+    if (firstSnap) {
+      firstSnap = false;
+      notes.forEach(function (n) { if (!remoteIds.has(n.id)) persist(n); });
+    }
+    loaded = true;
+    updateHint();
+  }
+  function onSnapErr() {
+    mode = 'local';
+    lsRead().forEach(function (d) { if (d && d.id) upsert(d.id, d); });
+    loaded = true;
+    updateHint();
+    say('Saving on this device only');
+  }
+
+  async function init() {
+    metrics();
+    var db = null, user = null, uid = null;
+    try {
+      if (window.claude && window.claude.use) {
+        db = await window.claude.use('db');
+        user = await window.claude.use('user');
+      }
+    } catch (e) {}
+    try { if (user) uid = await user.id(); } catch (e) {}
+    if (db && uid) {
+      try {
+        col = db.collection('data/users/' + uid);
+        mode = 'db';
+        col.onSnapshot(onSnap, onSnapErr);
+        return;
+      } catch (e) { col = null; }
+    }
+    mode = 'local';
+    var pending = Array.from(notes.values());
+    lsRead().forEach(function (d) { if (d && d.id) upsert(d.id, d); });
+    if (pending.length) lsWrite();
+    loaded = true;
+    updateHint();
+  }
+  init();
+})();
+</script>
+
+</body></html>
