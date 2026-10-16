@@ -75,6 +75,23 @@
             justify-content: center;
         }
 
+        .help-btn {
+            right: auto;
+            left: 0;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .help-btn:hover {
+            transform: none;
+        }
+
+        .modal .instructions {
+            margin-top: 0;
+            padding: 0;
+            background: none;
+        }
+
         .settings-btn:hover {
             background: rgba(255, 255, 255, 0.2);
             transform: rotate(45deg);
@@ -658,8 +675,36 @@
     <div class="container">
         <header>
             <h1>🎯 Mastermind</h1>
+            <button class="settings-btn help-btn" onclick="openHelp()" title="How to Play">?</button>
             <button class="settings-btn" onclick="openSettings()" title="Settings">⚙️</button>
         </header>
+
+        <div class="modal-overlay" id="helpModal" onclick="if (event.target === this) closeHelp()">
+            <div class="modal">
+                <h2>How to Play</h2>
+                <div class="instructions">
+                    <p>🎯 Work out the secret code before you run out of guesses. A code is a row of symbols, and a symbol can appear more than once.</p>
+                    <p>1. Tap a symbol to place it in the highlighted slot. Tap a slot to choose where the next symbol goes.</p>
+                    <p>2. Fill every slot, then tap <strong>✓ Submit</strong>. <strong>🗑️ Clear</strong> empties the row.</p>
+                    <p id="modeInstructions"></p>
+                    <p>4. <strong>💡 Hint</strong> fills the row with a strong next guess, based on the codes that are still possible.</p>
+                    <p id="optionInstructions"></p>
+                    <div class="peg-legend">
+                        <div class="peg-legend-item">
+                            <div class="peg exact"></div>
+                            <span>Exact: right symbol, right slot</span>
+                        </div>
+                        <div class="peg-legend-item">
+                            <div class="peg partial"></div>
+                            <span>Partial: right symbol, wrong slot</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-buttons">
+                    <button class="btn btn-primary" onclick="closeHelp()">Got it</button>
+                </div>
+            </div>
+        </div>
 
         <div class="modal-overlay" id="settingsModal">
             <div class="modal">
@@ -754,25 +799,6 @@
 
             <div class="guesses" id="guesses"></div>
 
-            <div class="instructions">
-                <h3>How to Play</h3>
-                <p>🎯 Work out the secret code before you run out of guesses. A code is a row of symbols, and a symbol can appear more than once.</p>
-                <p>1. Tap a symbol to place it in the highlighted slot. Tap a slot to choose where the next symbol goes.</p>
-                <p>2. Fill every slot, then tap <strong>✓ Submit</strong>. <strong>🗑️ Clear</strong> empties the row.</p>
-                <p id="modeInstructions"></p>
-                <p>4. <strong>💡 Hint</strong> fills the row with a strong next guess, based on the codes that are still possible.</p>
-                <p id="optionInstructions"></p>
-                <div class="peg-legend">
-                    <div class="peg-legend-item">
-                        <div class="peg exact"></div>
-                        <span>Exact: right symbol, right slot</span>
-                    </div>
-                    <div class="peg-legend-item">
-                        <div class="peg partial"></div>
-                        <span>Partial: right symbol, wrong slot</span>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -828,6 +854,14 @@
             document.getElementById('hideGuesses').checked = config.hideGuesses;
             updateSettingsVisibility();
             document.getElementById('settingsModal').classList.add('active');
+        }
+
+        function openHelp() {
+            document.getElementById('helpModal').classList.add('active');
+        }
+
+        function closeHelp() {
+            document.getElementById('helpModal').classList.remove('active');
         }
 
         function closeSettings() {
@@ -940,7 +974,7 @@
                     : '⏱️ The timer counts up from your first move.');
             }
             if (config.playMode && config.hideGuesses) {
-                extras.push('🙈 Only your latest guess stays visible. Earlier guesses are revealed when the game ends.');
+                extras.push('Only your latest guess stays visible. Earlier guesses are revealed when the game ends.');
             }
             optP.textContent = extras.join(' ');
             optP.style.display = extras.length ? 'block' : 'none';
@@ -1509,7 +1543,7 @@
             if (hideOlder && lastIndex > 0) {
                 const note = document.createElement('div');
                 note.className = 'guesses-hidden-note';
-                note.textContent = `🙈 ${lastIndex} earlier guess${lastIndex !== 1 ? 'es' : ''} hidden until the game ends`;
+                note.textContent = `${lastIndex} earlier guess${lastIndex !== 1 ? 'es' : ''} hidden until the game ends`;
                 guessesDiv.appendChild(note);
             }
         }
