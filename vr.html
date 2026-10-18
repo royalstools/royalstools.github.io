@@ -1,0 +1,252 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Drift Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&display=swap">
+<style>
+/* Layout: full-screen WebGL canvas split into left/right eye views, with a small control tray pinned to the bottom. */
+:root{
+  --bg:#07080d; --fg:#e8ebf5; --muted:#8c93ad; --accent:#ffb347; --line:#2a3048; --panel:rgba(12,14,24,.86);
+  --display:"Chakra Petch",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);overflow:hidden;font:500 14px/1.35 var(--display)}
+#view{position:fixed;inset:0;display:block;touch-action:none;cursor:grab}
+.dot{position:fixed;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#ff3b3b;pointer-events:none}
+#tray{
+  position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:10px;
+  padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  background:var(--panel);border-top:1px solid var(--line);
+}
+.row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.seg{display:flex;border:1px solid var(--line)}
+button,.seg label{
+  font:600 13px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--fg);
+  background:transparent;border:1px solid var(--line);padding:9px 12px;min-height:40px;cursor:pointer;touch-action:manipulation;
+}
+.seg label{border:0;display:flex;align-items:center}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg input:checked+span{color:var(--bg);background:var(--accent);margin:-9px -12px;padding:9px 12px;display:flex;align-items:center;min-height:40px;box-sizing:border-box}
+.seg label:focus-within,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.hold{min-width:84px}
+button.hold:active,button[aria-pressed="true"]{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.slider{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+input[type=range]{accent-color:var(--accent);width:130px}
+#hint{color:var(--muted);font-size:12px;letter-spacing:.02em;min-height:1.35em}
+#show{position:fixed;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));background:var(--panel)}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<canvas id="view"></canvas>
+<div class="dot" id="dotL"></div><div class="dot" id="dotR"></div>
+
+<div id="tray">
+  <div class="row">
+    <div class="seg" role="radiogroup" aria-label="Layout">
+      <label><input type="radio" name="mode" value="viewer" checked><span>Viewer</span></label>
+      <label><input type="radio" name="mode" value="free"><span>Free-view</span></label>
+    </div>
+    <button id="swap" aria-pressed="false">Swap eyes</button>
+    <label class="slider">Depth <input id="depth" type="range" min="0.1" max="1.6" step="0.05" value="0.6"></label>
+  </div>
+  <div class="row">
+    <button class="hold" id="fwd">Walk</button>
+    <button class="hold" id="back">Back</button>
+    <button id="motion" hidden>Motion look</button>
+    <button id="hide">Hide</button>
+    <span id="hint">Drag to look around. Hold Walk to move.</span>
+  </div>
+</div>
+<button id="show" hidden>Controls</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var canvas=$('view');
+  var renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  renderer.setScissorTest(true);
+  var BG=0x07080d;
+  var scene=new THREE.Scene();
+  scene.background=new THREE.Color(BG);
+  scene.fog=new THREE.Fog(BG,18,95);
+
+  // lights
+  scene.add(new THREE.HemisphereLight(0xcfd6ff,0x1a1020,0.9));
+  var lamp=new THREE.PointLight(0xffd9a0,1.4,70); scene.add(lamp);
+
+  // floor grid
+  var grid=new THREE.GridHelper(400,160,0xffb347,0x2a3048); grid.position.y=0; scene.add(grid);
+
+  // floating shapes
+  var palette=[0xffb347,0x3dd6c6,0xff5d8f,0xcfd6ff];
+  var geos=[new THREE.IcosahedronGeometry(1,0),new THREE.OctahedronGeometry(1.1,0),new THREE.BoxGeometry(1.4,1.4,1.4),new THREE.TorusGeometry(1,0.28,8,20)];
+  var seed=11; function rnd(){seed=(seed*16807)%2147483647;return (seed-1)/2147483646}
+  var things=[];
+  for(var i=0;i<170;i++){
+    var m=new THREE.MeshStandardMaterial({color:palette[i%4],flatShading:true,roughness:0.55,metalness:0.1,emissive:palette[i%4],emissiveIntensity:0.12});
+    var mesh=new THREE.Mesh(geos[Math.floor(rnd()*4)],m);
+    var r=6+rnd()*52, th=rnd()*Math.PI*2;
+    mesh.position.set(Math.cos(th)*r,0.8+Math.pow(rnd(),1.6)*24,Math.sin(th)*r);
+    var s=0.5+rnd()*1.8; mesh.scale.set(s,s,s);
+    mesh.rotation.set(rnd()*6,rnd()*6,rnd()*6);
+    mesh.userData.spin=(rnd()-0.5)*0.8;
+    scene.add(mesh); things.push(mesh);
+  }
+  // tall wire pillars give strong vertical depth cues
+  var pillarMat=new THREE.MeshBasicMaterial({color:0x3dd6c6,wireframe:true});
+  for(var p=0;p<36;p++){
+    var h=8+rnd()*28, pr=10+rnd()*45, pa=rnd()*Math.PI*2;
+    var pil=new THREE.Mesh(new THREE.BoxGeometry(1.6,h,1.6,1,Math.ceil(h/2),1),pillarMat);
+    pil.position.set(Math.cos(pa)*pr,h/2,Math.sin(pa)*pr); scene.add(pil);
+  }
+  // rings
+  var ringMat=new THREE.MeshBasicMaterial({color:0xff5d8f,wireframe:true});
+  for(var k=0;k<7;k++){
+    var ring=new THREE.Mesh(new THREE.TorusGeometry(7,0.08,6,48),ringMat);
+    ring.position.set(0,6,-k*14+6); scene.add(ring);
+  }
+  // star dust
+  var sp=new Float32Array(1800*3);
+  for(var j=0;j<1800;j++){var rr=15+rnd()*80,a=rnd()*6.283,b=Math.acos(rnd()*2-1);sp[j*3]=rr*Math.sin(b)*Math.cos(a);sp[j*3+1]=Math.abs(rr*Math.cos(b))+1;sp[j*3+2]=rr*Math.sin(b)*Math.sin(a)}
+  var sg=new THREE.BufferGeometry(); sg.setAttribute('position',new THREE.BufferAttribute(sp,3));
+  scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xe8ebf5,size:0.18,sizeAttenuation:true,fog:false})));
+
+  // rig and eye cameras
+  var rig=new THREE.Group(); rig.position.set(0,2,14); scene.add(rig);
+  var camL=new THREE.PerspectiveCamera(70,1,0.1,200), camR=new THREE.PerspectiveCamera(70,1,0.1,200);
+  rig.add(camL); rig.add(camR);
+
+  // state
+  var yaw=0,pitch=0,mode='viewer',swap=false,depth=0.6,W=0,H=0,gyro=false,qDev=new THREE.Quaternion();
+  var walk=0;
+
+  function layout(){
+    W=window.innerWidth;H=window.innerHeight;
+    renderer.setSize(W,H,false);
+    canvas.style.width=W+'px';canvas.style.height=H+'px';
+    var tray=$('tray').hidden?0:$('tray').offsetHeight;
+    var availH=H-tray;
+    var boxes=[];
+    if(mode==='viewer'){
+      boxes=[{x:0,y:0,w:W/2,h:H},{x:W/2,y:0,w:W/2,h:H}];
+    }else{
+      var s=Math.max(80,Math.min(W/2-10,availH-44));
+      var y=Math.max(30,(availH-s)/2+10);
+      boxes=[{x:W/2-s-4,y:H-y-s,w:s,h:s},{x:W/2+4,y:H-y-s,w:s,h:s}];
+    }
+    layout.boxes=boxes;
+    [[$('dotL'),boxes[0]],[$('dotR'),boxes[1]]].forEach(function(d){
+      d[0].hidden=mode!=='free';
+      d[0].style.left=(d[1].x+d[1].w/2)+'px';
+      d[0].style.top=Math.max(14,(H-d[1].y-d[1].h)-18)+'px';
+    });
+  }
+
+  function render(){
+    // clear whole canvas first
+    renderer.setScissor(0,0,W,H);renderer.setViewport(0,0,W,H);
+    renderer.setClearColor(BG,1);renderer.clear();
+    var half=0.5*0.063*depth*10; // scene units; depth slider scales the eye gap
+    var bx=layout.boxes;
+    var left=swap?camR:camL,right=swap?camL:camR;
+    camL.position.set(-half,0,0);camR.position.set(half,0,0);
+    var order=[left,right];
+    for(var i=0;i<2;i++){
+      var b=bx[i],c=order[i];
+      var vy=H-b.y-b.h; // three uses bottom-left origin
+      renderer.setViewport(b.x,vy,b.w,b.h);renderer.setScissor(b.x,vy,b.w,b.h);
+      c.aspect=b.w/b.h;c.updateProjectionMatrix();
+      renderer.render(scene,c);
+    }
+  }
+
+  var last=performance.now();
+  function frame(t){
+    var dt=Math.min(0.05,(t-last)/1000);last=t;
+    if(gyro){rig.quaternion.copy(qYaw()).multiply(qDev)}
+    else{rig.rotation.set(pitch,yaw,0,'YXZ')}
+    if(walk!==0){
+      var f=new THREE.Vector3(0,0,-1).applyQuaternion(rig.quaternion);f.y=0;
+      if(f.lengthSq()<1e-6)f.set(0,0,-1);f.normalize();
+      rig.position.addScaledVector(f,walk*4*dt);
+      var len=Math.hypot(rig.position.x,rig.position.z);if(len>55){rig.position.x*=55/len;rig.position.z*=55/len}
+    }
+    lamp.position.copy(rig.position);
+    for(var i=0;i<things.length;i++){things[i].rotation.y+=things[i].userData.spin*dt}
+    render();
+    requestAnimationFrame(frame);
+  }
+  var qy=new THREE.Quaternion(),up=new THREE.Vector3(0,1,0);
+  function qYaw(){return qy.setFromAxisAngle(up,yaw)}
+
+  // look: drag
+  var drag=null;
+  canvas.addEventListener('pointerdown',function(e){drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId);canvas.style.cursor='grabbing'});
+  canvas.addEventListener('pointermove',function(e){
+    if(!drag)return;
+    var dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;
+    yaw-=dx*0.006;
+    if(!gyro)pitch=Math.max(-1.4,Math.min(1.4,pitch-dy*0.006));
+  });
+  function endDrag(){drag=null;canvas.style.cursor='grab'}
+  canvas.addEventListener('pointerup',endDrag);canvas.addEventListener('pointercancel',endDrag);
+
+  // walk buttons and keys
+  function holdBtn(id,dir){
+    var el=$(id);
+    el.addEventListener('pointerdown',function(e){walk=dir;el.setPointerCapture(e.pointerId);e.preventDefault()});
+    ['pointerup','pointercancel','lostpointercapture'].forEach(function(n){el.addEventListener(n,function(){walk=0})});
+  }
+  holdBtn('fwd',1);holdBtn('back',-1);
+  var keys={};
+  window.addEventListener('keydown',function(e){
+    var k=e.key.toLowerCase();
+    if(k==='w'||k==='arrowup')walk=1;else if(k==='s'||k==='arrowdown')walk=-1;
+    else if(k==='a'||k==='arrowleft')yaw+=0.06;else if(k==='d'||k==='arrowright')yaw-=0.06;
+  });
+  window.addEventListener('keyup',function(e){var k=e.key.toLowerCase();if(['w','s','arrowup','arrowdown'].indexOf(k)>-1)walk=0});
+
+  // controls
+  Array.prototype.forEach.call(document.querySelectorAll('input[name=mode]'),function(r){
+    r.addEventListener('change',function(){mode=r.value;$('hint').textContent=mode==='free'?'Look at the red dots, then relax your eyes as if looking through the screen until the two views merge.':'Drag to look around. Hold Walk to move.';layout()});
+  });
+  $('swap').addEventListener('click',function(){swap=!swap;this.setAttribute('aria-pressed',swap)});
+  $('depth').addEventListener('input',function(){depth=parseFloat(this.value)});
+  $('hide').addEventListener('click',function(){$('tray').hidden=true;$('show').hidden=false;layout()});
+  $('show').addEventListener('click',function(){$('tray').hidden=false;$('show').hidden=true;layout()});
+
+  // motion look: lights up only where the viewer exposes the device sensors
+  var DOE=window.DeviceOrientationEvent;
+  if(DOE){$('motion').hidden=false}
+  var zee=new THREE.Vector3(0,0,1),eu=new THREE.Euler(),q0=new THREE.Quaternion(),q1=new THREE.Quaternion(-Math.sqrt(0.5),0,0,Math.sqrt(0.5));
+  var gotEvent=false;
+  function onOri(e){
+    if(e.alpha==null)return;
+    gotEvent=true;gyro=true;
+    var d=Math.PI/180,o=((screen.orientation&&screen.orientation.angle)||window.orientation||0)*d;
+    eu.set(e.beta*d,e.alpha*d,-e.gamma*d,'YXZ');
+    qDev.setFromEuler(eu);qDev.multiply(q1);qDev.multiply(q0.setFromAxisAngle(zee,-o));
+  }
+  $('motion').addEventListener('click',function(){
+    var btn=this;
+    if(gyro){gyro=false;window.removeEventListener('deviceorientation',onOri);btn.setAttribute('aria-pressed','false');$('hint').textContent='Drag to look around. Hold Walk to move.';return}
+    var go=function(){
+      gotEvent=false;window.addEventListener('deviceorientation',onOri);btn.setAttribute('aria-pressed','true');
+      $('hint').textContent='Turn your phone to look around. Drag to turn the whole room.';
+      setTimeout(function(){if(!gotEvent){window.removeEventListener('deviceorientation',onOri);btn.setAttribute('aria-pressed','false');$('hint').textContent='This page cannot read your phone sensors here. Drag to look instead.'}},1500);
+    };
+    try{
+      if(typeof DOE.requestPermission==='function'){DOE.requestPermission().then(function(s){if(s==='granted')go();else $('hint').textContent='Motion access was declined. Drag to look instead.'}).catch(function(){$('hint').textContent='Motion access is not available here. Drag to look instead.'})}
+      else go();
+    }catch(err){$('hint').textContent='Motion access is not available here. Drag to look instead.'}
+  });
+
+  window.addEventListener('resize',layout);
+  window.addEventListener('orientationchange',function(){setTimeout(layout,200)});
+  layout();
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>
