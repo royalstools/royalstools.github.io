@@ -1,5 +1,5 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>Slow Tide</title>
+<title>Breathing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Figtree:wght@400;500;600&display=swap">
@@ -60,6 +60,7 @@
 :root[data-theme="dark"] { color-scheme: dark; }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { min-height: 100%; }
 body {
   background: var(--bg);
@@ -108,12 +109,45 @@ h1 { font-family: var(--font-display); font-weight: 400; font-size: 1.9rem; lett
 .phase { font-family: var(--font-display); font-size: 2.3rem; line-height: 1.1; text-align: center; min-height: 1.1em; margin: 0; }
 .phase-sub { color: var(--muted); font-size: .92rem; text-align: center; margin: -10px 0 0; min-height: 1.4em; font-variant-numeric: tabular-nums; }
 
+/* Main page: the stage fills the screen with the orb and the breath dots. Everything else lives in the settings sheet. */
+.stage { position: fixed; inset: 0; z-index: 10; justify-content: center; gap: 0;
+  padding: max(24px, env(safe-area-inset-top, 0px)) 20px max(24px, env(safe-area-inset-bottom, 0px)); }
+.stage .orb-box { width: min(82vw, 50vh, 420px); cursor: pointer; }
+.stage.live { cursor: pointer; -webkit-user-select: none; user-select: none; }
+.stage.paused .orb-box, .stage.paused .counter { opacity: .3; transition: opacity .3s; }
+.pause { position: fixed; inset: 0; z-index: 25; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; cursor: default; padding-inline: 20px; background: color-mix(in srgb, var(--bg) 55%, transparent); }
+.pause[hidden] { display: none; }
+.pause p { font-family: var(--font-display); font-size: 2.2rem; margin: 0 0 6px; }
+.pause .btn { flex: none; width: min(100%, 260px); }
+
+.gear { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 14px); right: 14px; z-index: 30; width: 46px; height: 46px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted); display: grid; place-items: center; cursor: pointer; padding: 0; transition: color .2s, border-color .2s; }
+.gear:hover { color: var(--fg); border-color: var(--accent); }
+.gear svg { width: 22px; height: 22px; display: block; }
+
+.sheet { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+.sheet[hidden] { display: none; }
+.scrim { position: absolute; inset: 0; background: rgba(3, 10, 11, .62); animation: fade .25s ease both; }
+.panel { position: relative; width: min(100%, 520px); max-height: 92%; overflow-y: auto; overscroll-behavior: contain; background: var(--surface-solid);
+  border: 1px solid var(--line); border-radius: 24px 24px 0 0; padding: 20px 20px calc(28px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 26px; animation: sheetUp .35s ease both; }
+@media (min-width: 640px) { .sheet { align-items: center; } .panel { border-radius: 24px; max-height: 88%; } }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.panel-head h2 { font-family: var(--font-display); font-weight: 400; font-size: 1.8rem; margin: 0; }
+.close { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; padding: 0; }
+.close:hover { color: var(--fg); }
+.close svg { width: 18px; height: 18px; display: block; }
+.panel .today { text-align: center; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheetUp { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .scrim, .panel { animation: none; } }
+
 /* Breath counter */
-.counter { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; min-width: 0; }
+.counter { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-width: 340px; min-width: 0; margin-bottom: 36px; min-height: 11px; }
 .counter-num { font-variant-numeric: tabular-nums; font-size: .9rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .counter-num b { color: var(--fg); font-weight: 600; font-size: 1.15rem; letter-spacing: 0; }
 .dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; max-width: 100%; }
-.dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--line); background: transparent; transition: background .5s, border-color .5s, transform .5s; }
+.dot { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--line); background: transparent; transition: background .5s, border-color .5s, transform .5s; }
 .dot.on { background: var(--accent); border-color: var(--accent); }
 .dot.now { border-color: var(--accent); transform: scale(1.25); }
 
@@ -184,59 +218,73 @@ button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 55%, 
 }
 </style>
 
-<div class="wrap">
-  <header>
-    <h1>Slow Tide</h1>
-    <span class="today" id="today"></span>
-  </header>
-
-  <section class="stage" aria-label="Breathing guide">
-    <div class="orb-box idle" id="orbBox">
-      <div class="glow" id="glow"></div>
-      <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
-        <circle class="track" cx="50" cy="50" r="48.6"></circle>
-        <circle class="prog" id="prog" cx="50" cy="50" r="48.6" stroke-dasharray="305.4" stroke-dashoffset="305.4"></circle>
-      </svg>
-      <div class="orb-wrap" id="orbWrap">
-        <div class="orb" id="orb"></div>
-        <div class="count" id="count">4</div>
-      </div>
-    </div>
-    <p class="phase" id="phase" aria-live="polite">Ready</p>
-    <p class="phase-sub" id="phaseSub">Settle in and press begin</p>
-
-    <div class="counter">
-      <div class="counter-num" id="counterNum"></div>
-      <div class="dots" id="dots" aria-hidden="true"></div>
-    </div>
-  </section>
-
-  <div class="actions">
-    <button class="btn" id="startBtn" type="button">Begin</button>
+<section class="stage" id="stage" aria-label="Breathing guide">
+  <div class="counter">
+    <div class="counter-num sr" id="counterNum"></div>
+    <div class="dots" id="dots" aria-hidden="true"></div>
   </div>
-
-  <section>
-    <p class="section-label"><span>Pattern</span><span id="customTag"></span></p>
-    <div class="presets" id="presets"></div>
-    <p class="desc" id="desc"></p>
-  </section>
-
-  <section class="shape" aria-label="One breath">
-    <svg id="shapeSvg" viewBox="0 0 300 54" preserveAspectRatio="none" aria-hidden="true"></svg>
-    <div class="shape-meta"><span id="cycleMeta"></span><span id="totalMeta"></span></div>
-  </section>
-
-  <section class="sliders" id="sliders" aria-label="Customize timing">
-    <div class="row"><label for="sIn">Breathe in</label><span class="val" id="vIn"></span><input id="sIn" type="range" min="1" max="12" step="1"></div>
-    <div class="row"><label for="sHin">Hold after in</label><span class="val" id="vHin"></span><input id="sHin" type="range" min="0" max="12" step="1"></div>
-    <div class="row"><label for="sOut">Breathe out</label><span class="val" id="vOut"></span><input id="sOut" type="range" min="1" max="16" step="1"></div>
-    <div class="row"><label for="sHout">Hold after out</label><span class="val" id="vHout"></span><input id="sHout" type="range" min="0" max="12" step="1"></div>
-    <div class="row rounds-row"><label for="sRounds">Breaths</label><span class="val" id="vRounds"></span><input id="sRounds" type="range" min="1" max="30" step="1">
-      <label class="endless" style="grid-column:1/-1"><input id="endless" type="checkbox"> Keep going until I stop</label>
+  <div class="orb-box idle" id="orbBox" role="button" tabindex="0" aria-label="Begin breathing">
+    <div class="glow" id="glow"></div>
+    <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
+      <circle class="track" cx="50" cy="50" r="48.6"></circle>
+      <circle class="prog" id="prog" cx="50" cy="50" r="48.6" stroke-dasharray="305.4" stroke-dashoffset="305.4"></circle>
+    </svg>
+    <div class="orb-wrap" id="orbWrap">
+      <div class="orb" id="orb"></div>
+      <div class="count" id="count">4</div>
     </div>
-  </section>
+  </div>
+  <p class="phase sr" id="phase" aria-live="polite">Ready</p>
+  <p class="phase-sub sr" id="phaseSub"></p>
+</section>
 
-  <p class="foot">Breathe in gently through your nose. Breathe out slowly through pursed lips, as if blowing through a straw. Stop any time you feel lightheaded.</p>
+<div class="pause" id="pauseEl" hidden>
+  <p>Paused</p>
+  <button class="btn" id="resumeBtn" type="button">Resume</button>
+  <button class="btn ghost" id="endBtn" type="button">End session</button>
+</div>
+
+<button class="gear" id="gear" type="button" aria-label="Settings" aria-haspopup="dialog">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="3.2"></circle>
+    <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"></path>
+  </svg>
+</button>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="scrim" id="scrim"></div>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="panel-head">
+      <h2 id="sheetTitle">Breathing</h2>
+      <button class="close" id="closeBtn" type="button" aria-label="Close settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
+
+    <section>
+      <p class="section-label"><span>Pattern</span><span id="customTag"></span></p>
+      <div class="presets" id="presets"></div>
+      <p class="desc" id="desc"></p>
+    </section>
+
+    <section class="shape" aria-label="One breath">
+      <svg id="shapeSvg" viewBox="0 0 300 54" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <div class="shape-meta"><span id="cycleMeta"></span><span id="totalMeta"></span></div>
+    </section>
+
+    <section class="sliders" id="sliders" aria-label="Customize timing">
+      <div class="row"><label for="sIn">Breathe in</label><span class="val" id="vIn"></span><input id="sIn" type="range" min="1" max="12" step="1"></div>
+      <div class="row"><label for="sHin">Hold after in</label><span class="val" id="vHin"></span><input id="sHin" type="range" min="0" max="12" step="1"></div>
+      <div class="row"><label for="sOut">Breathe out</label><span class="val" id="vOut"></span><input id="sOut" type="range" min="1" max="16" step="1"></div>
+      <div class="row"><label for="sHout">Hold after out</label><span class="val" id="vHout"></span><input id="sHout" type="range" min="0" max="12" step="1"></div>
+      <div class="row rounds-row"><label for="sRounds">Breaths</label><span class="val" id="vRounds"></span><input id="sRounds" type="range" min="1" max="30" step="1">
+        <label class="endless" style="grid-column:1/-1"><input id="endless" type="checkbox"> Keep going until I stop</label>
+      </div>
+    </section>
+
+    <p class="foot">Breathe in gently through your nose. Breathe out slowly through pursed lips, as if blowing through a straw. Stop any time you feel lightheaded.</p>
+    <span class="today" id="today"></span>
+  </div>
 </div>
 
 <script>
@@ -260,10 +308,12 @@ button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 55%, 
   var sRounds = $('sRounds'), vRounds = $('vRounds'), endless = $('endless');
   var orbWrap = $('orbWrap'), orb = $('orb'), glow = $('glow'), prog = $('prog'), count = $('count');
   var phaseEl = $('phase'), phaseSub = $('phaseSub'), orbBox = $('orbBox');
-  var counterNum = $('counterNum'), dotsEl = $('dots'), startBtn = $('startBtn');
+  var counterNum = $('counterNum'), dotsEl = $('dots');
+  var gear = $('gear'), sheet = $('sheet');
   var CIRC = 305.4;
 
-  var running = false, startT = 0, raf = 0, wakeLock = null, lastKey = '';
+  var running = false, paused = false, pausedAt = 0, doneTimer = 0, startT = 0, raf = 0, wakeLock = null, lastKey = '';
+  var stage = $('stage'), pauseEl = $('pauseEl');
   var plan = { t: [4, 7, 8, 0], rounds: 4, inf: false };
 
   /* storage: light per-viewer convenience only */
@@ -344,7 +394,6 @@ button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 55%, 
     phaseEl.textContent = 'Ready'; phaseSub.textContent = 'Settle in and press begin';
     counterNum.innerHTML = plan.inf ? 'Breaths <b>∞</b>' : 'Breaths <b>' + plan.rounds + '</b>';
     buildDots(plan.rounds);
-    startBtn.textContent = 'Begin'; startBtn.className = 'btn';
   }
 
   function updateDots(done, cur) {
@@ -390,32 +439,79 @@ button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 55%, 
   }
 
   function start() {
-    running = true; lastKey = ''; lock(true); orbBox.classList.remove('idle');
-    startBtn.textContent = 'Stop'; startBtn.className = 'btn ghost';
+    running = true; paused = false; lastKey = ''; lock(true); orbBox.classList.remove('idle');
+    clearTimeout(doneTimer);
+    stage.classList.remove('done', 'paused'); stage.classList.add('live'); pauseEl.hidden = true; gear.hidden = true;
+    document.documentElement.style.overflow = 'hidden';
     startT = performance.now(); wake(true);
     raf = requestAnimationFrame(tick);
   }
 
-  function elapsedBreaths() { return Math.floor(((performance.now() - startT) / 1000) / cycleLen()); }
+  function pauseSession() {
+    if (!running || paused) return;
+    paused = true; pausedAt = performance.now(); cancelAnimationFrame(raf);
+    stage.classList.add('paused'); pauseEl.hidden = false;
+  }
+  function resumeSession() {
+    if (!running || !paused) return;
+    startT += performance.now() - pausedAt; paused = false;
+    stage.classList.remove('paused'); pauseEl.hidden = true;
+    raf = requestAnimationFrame(tick);
+  }
+  function exitSession() {
+    clearTimeout(doneTimer);
+    stage.classList.remove('live', 'done', 'paused'); pauseEl.hidden = true; gear.hidden = false;
+    document.documentElement.style.overflow = '';
+    renderIdle();
+  }
+
+  function elapsedBreaths() { return Math.floor((((paused ? pausedAt : performance.now()) - startT) / 1000) / cycleLen()); }
 
   function finish(completed) {
     var n = completed ? plan.rounds : Math.min(elapsedBreaths(), plan.inf ? 1e9 : plan.rounds);
-    running = false; cancelAnimationFrame(raf); lock(false); wake(false);
+    running = false; paused = false; cancelAnimationFrame(raf); lock(false); wake(false);
+    pauseEl.hidden = true; stage.classList.remove('paused');
     if (n > 0) { memToday += n; addToday(n); }
     if (completed) {
       orbBox.classList.add('idle'); setOrb(0.5, 0.5); count.textContent = '✓';
       orb.classList.remove('hold'); prog.classList.remove('hold'); prog.style.strokeDashoffset = 0;
-      phaseEl.textContent = 'Well done'; phaseSub.textContent = plan.rounds + ' breaths · ' + fmt(cycleLen() * plan.rounds);
-      counterNum.innerHTML = '<b>' + plan.rounds + '</b> of ' + plan.rounds + ' done';
-      updateDots(plan.rounds, -1);
-      startBtn.textContent = 'Again'; startBtn.className = 'btn';
+      var summary = plan.rounds + ' breaths · ' + fmt(cycleLen() * plan.rounds);
+      phaseEl.textContent = 'Well done'; phaseSub.textContent = summary;
+      stage.classList.add('done');
+      doneTimer = setTimeout(function () { leaveDone(summary); }, 3500);
     } else {
-      renderIdle();
+      exitSession();
       if (n > 0) phaseSub.textContent = n + (n === 1 ? ' breath' : ' breaths') + ' completed';
     }
   }
 
-  startBtn.addEventListener('click', function () { running ? finish(false) : start(); });
+  function leaveDone(summary) {
+    exitSession();
+    phaseEl.textContent = 'Well done'; phaseSub.textContent = summary;
+  }
+
+  stage.addEventListener('click', function (e) {
+    if (stage.classList.contains('live')) {
+      if (stage.classList.contains('done')) leaveDone(phaseSub.textContent);
+      else pauseSession();
+    } else if (e.target.closest('#orbBox')) start();
+  });
+  orbBox.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && !running) { e.preventDefault(); e.stopPropagation(); start(); }
+  });
+
+  function openSheet() { sheet.hidden = false; $('closeBtn').focus(); }
+  function closeSheet() { sheet.hidden = true; gear.focus(); }
+  gear.addEventListener('click', openSheet);
+  $('closeBtn').addEventListener('click', closeSheet);
+  $('scrim').addEventListener('click', closeSheet);
+  $('resumeBtn').addEventListener('click', resumeSession);
+  $('endBtn').addEventListener('click', function () { finish(false); });
+  document.addEventListener('keydown', function (e) {
+    if (!sheet.hidden) { if (e.key === 'Escape') closeSheet(); return; }
+    if (!running || (e.key !== 'Escape' && e.key !== ' ')) return;
+    e.preventDefault(); paused ? resumeSession() : pauseSession();
+  });
   sl.concat([sRounds, endless]).forEach(function (el) { el.addEventListener('input', function () { if (!running) readControls(); }); });
   document.addEventListener('visibilitychange', function () { if (running && !document.hidden && !wakeLock) wake(true); });
 
