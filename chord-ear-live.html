@@ -1,0 +1,1082 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Chord Ear</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..700;1,6..96,400..700&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Music&text=%E2%99%AF%E2%99%AD&display=swap">
+<style>
+/* Layout: one column, like a tuner face over a lead sheet. Chord wheel (circle of fifths) up top, the take's chord chart below, tips last. */
+:root {
+  --paper: #ECEFF4;
+  --card: #FFFFFF;
+  --ink: #151A24;
+  --ink-2: #586174;
+  --rule: #D3D9E3;
+  --staff: #C3CAD6;
+  --accent: #3A36B4;
+  --accent-soft: #E4E3F8;
+  --on-accent: #FFFFFF;
+  --good: #1D7449; --good-soft: #DCF0E4;
+  --warn: #9C5300; --warn-soft: #FAEAD2;
+  --live: #C7243A; --on-live: #FFFFFF;
+  --f-display: "Bodoni Moda", "Noto Music", "Bodoni 72", Didot, Georgia, serif;
+  --f-body: "Figtree", "Noto Music", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-mono: "IBM Plex Mono", "Noto Music", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0E1118; --card: #161A23; --ink: #E8EBF2; --ink-2: #9BA3B4; --rule: #2A303D; --staff: #363E4E;
+    --accent: #A4A0FF; --accent-soft: #25244A; --on-accent: #15142E;
+    --good: #52C68E; --good-soft: #15342A; --warn: #F0A64A; --warn-soft: #382812;
+    --live: #FF5D71; --on-live: #2A0910;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0E1118; --card: #161A23; --ink: #E8EBF2; --ink-2: #9BA3B4; --rule: #2A303D; --staff: #363E4E;
+  --accent: #A4A0FF; --accent-soft: #25244A; --on-accent: #15142E;
+  --good: #52C68E; --good-soft: #15342A; --warn: #F0A64A; --warn-soft: #382812;
+  --live: #FF5D71; --on-live: #2A0910;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.5 var(--f-body); -webkit-font-smoothing: antialiased; }
+.app {
+  max-width: 720px; margin: 0 auto;
+  padding-block: 20px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 14px;
+}
+.top { display: flex; align-items: baseline; justify-content: space-between; gap: 4px 14px; flex-wrap: wrap; padding: 2px 2px 4px; }
+.brand { margin: 0; font: italic 600 32px/1 var(--f-display); letter-spacing: -0.01em; font-variation-settings: "opsz" 72; }
+.tagline { margin: 0; color: var(--ink-2); font-size: 14px; }
+
+.panel { background: var(--card); border: 1px solid var(--rule); border-radius: 18px; padding: 18px; min-width: 0; }
+
+/* Stage */
+.stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-block: 20px 16px; }
+.wheel-wrap { position: relative; width: min(100%, 340px); aspect-ratio: 1 / 1; max-width: 100%; }
+.wheel-wrap svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.ring { fill: none; stroke: var(--rule); stroke-width: 1.2; stroke-dasharray: 2 5; }
+.shape { fill: var(--accent); fill-opacity: .07; stroke: var(--accent); stroke-opacity: .5; stroke-width: 1.6; stroke-linejoin: round; transition: all .18s ease; }
+.node .base { fill: var(--card); stroke: var(--rule); stroke-width: 1.2; }
+.node .glow { fill: var(--accent); transition: fill-opacity .12s linear; }
+.node .nm { fill: var(--ink); font: 600 14px var(--f-body); text-anchor: middle; dominant-baseline: central; }
+.node.tone .base { stroke: var(--accent); stroke-width: 2.2; }
+.node.root .glow { fill-opacity: 1 !important; }
+.node.root .nm { fill: var(--on-accent); }
+.bassdot { fill: var(--ink); opacity: 0; transition: opacity .15s; }
+.bassdot.on { opacity: 1; }
+.readout { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none; padding: 0 20%; }
+.chord { font-family: var(--f-display); font-weight: 600; font-size: 72px; line-height: 1; letter-spacing: -0.02em; white-space: nowrap; font-variation-settings: "opsz" 96; }
+.chord sup { font-size: .46em; vertical-align: baseline; position: relative; top: -.95em; margin-left: .03em; font-weight: 500; letter-spacing: 0; }
+.chord .acc { font-size: .6em; vertical-align: baseline; position: relative; top: -.6em; margin: 0 .01em; }
+.chord sup .acc { font-size: .85em; top: -.1em; }
+.chord .slash { font-weight: 400; color: var(--ink-2); margin: 0 .03em; }
+.chord .nc { font-style: italic; font-weight: 500; color: var(--ink-2); font-size: .62em; }
+.words { margin-top: 10px; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); max-width: 100%; }
+
+.facts { width: 100%; margin: 0; display: grid; grid-template-columns: 1.3fr 0.8fr 1fr; gap: 10px; border-top: 1px solid var(--rule); padding-top: 14px; }
+.facts > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.facts dt { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.facts dd { margin: 0; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.pill { display: inline-block; font-size: 12.5px; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.pill[data-q="clear"] { background: var(--good-soft); color: var(--good); }
+.pill[data-q="unsure"] { background: var(--warn-soft); color: var(--warn); }
+.pill[data-q="none"] { background: var(--paper); color: var(--ink-2); }
+
+/* Buttons */
+.btn { appearance: none; border: 1px solid transparent; border-radius: 999px; padding: 12px 18px; font: 600 15px/1 var(--f-body); cursor: pointer; display: inline-flex; align-items: center; gap: 9px; color: var(--ink); background: transparent; }
+.btn.primary { background: var(--accent); color: var(--on-accent); }
+.btn.ghost { border-color: var(--rule); }
+.btn:hover { filter: brightness(1.06); }
+.btn:focus-visible, .play:focus-visible, .seg:focus-visible, .chip:focus-visible, #file:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 3px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+
+/* Live */
+.live-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.btn.rec .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--live); }
+.btn.rec { border-color: var(--rule); }
+.btn.rec.on { background: var(--live); color: var(--on-live); border-color: transparent; }
+.btn.rec.on .dot { background: var(--on-live); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+.level { flex: 1; min-width: 120px; height: 6px; border-radius: 6px; background: var(--rule); overflow: hidden; }
+.level i { display: block; height: 100%; width: 0; background: var(--good); transition: width .08s linear; }
+.recent { display: flex; align-items: baseline; gap: 10px; margin-top: 14px; flex-wrap: wrap; min-height: 28px; }
+.recent .lbl { font: italic 600 20px/1.1 var(--f-display); color: var(--ink-2); }
+.recent .lbl:first-of-type { color: var(--ink); }
+
+/* Source */
+.source-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.hint { margin: 12px 0 0; color: var(--ink-2); font-size: 14.5px; max-width: 62ch; }
+.panel.drag { border-color: var(--accent); background: var(--accent-soft); }
+.status { margin: 12px 0 0; font-size: 14.5px; }
+.status.err { color: var(--warn); font-weight: 600; }
+.bar { height: 3px; background: var(--rule); border-radius: 3px; overflow: hidden; margin-top: 8px; max-width: 360px; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+
+/* Sheet */
+.sheet-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.tag { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; background: var(--paper); color: var(--ink-2); border: 1px solid var(--rule); }
+.src-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.key { margin-left: auto; color: var(--ink-2); font-size: 14px; }
+.transport { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.play { width: 48px; height: 48px; flex: none; border-radius: 50%; border: 0; background: var(--ink); color: var(--card); display: grid; place-items: center; cursor: pointer; }
+.play svg { width: 18px; height: 18px; fill: currentColor; }
+.time { font: 500 14px var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.strip-scroll { overflow-x: auto; margin: 12px -18px 0; padding: 0 18px 4px; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+.strip { position: relative; display: flex; min-width: max-content; height: 92px; padding-right: 14px; }
+.strip::before { content: ""; position: absolute; left: 0; right: 0; bottom: 8px; height: 29px; background: repeating-linear-gradient(to bottom, var(--staff) 0 1px, transparent 1px 7px); }
+.strip::after { content: ""; position: absolute; right: 0; bottom: 8px; height: 29px; width: 8px; border-left: 1px solid var(--ink); border-right: 3.5px solid var(--ink); }
+.seg { position: relative; flex: none; height: 100%; border: 0; margin: 0; background: transparent; padding: 6px 4px 0 9px; text-align: left; cursor: pointer; color: var(--ink); font: inherit; border-radius: 8px 8px 0 0; }
+.seg::before { content: ""; position: absolute; left: 0; bottom: 8px; height: 29px; width: 1.5px; background: var(--ink); }
+.seg .lbl { display: block; font: italic 600 23px/1.1 var(--f-display); white-space: nowrap; }
+.seg .lbl sup { font-size: .55em; vertical-align: baseline; position: relative; top: -.75em; margin-left: .02em; }
+.seg .lbl .slash, .chip .lbl .slash { color: var(--ink-2); font-weight: 400; }
+.seg .lbl .nc { color: var(--ink-2); font-weight: 500; font-size: .8em; }
+.seg .at { display: block; font: 400 10.5px var(--f-mono); color: var(--ink-2); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.seg:hover { background: color-mix(in srgb, var(--accent-soft) 50%, transparent); }
+.seg.on { background: var(--accent-soft); }
+.seg.on .lbl { color: var(--accent); }
+.playhead { position: absolute; top: 0; bottom: 8px; left: 0; width: 2px; margin-left: -1px; background: var(--accent); border-radius: 2px; pointer-events: none; }
+
+.used { margin-top: 16px; border-top: 1px solid var(--rule); padding-top: 14px; }
+.sub { margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: baseline; gap: 7px; padding: 6px 12px 7px; border-radius: 10px; border: 1px solid var(--rule); background: var(--card); color: var(--ink); cursor: pointer; font: inherit; }
+.chip:hover { border-color: var(--accent); }
+.chip .lbl { font: italic 600 19px/1.1 var(--f-display); }
+.chip .lbl sup { font-size: .55em; vertical-align: baseline; position: relative; top: -.7em; }
+.chip .n { font: 400 11px var(--f-mono); color: var(--ink-2); }
+
+/* Tips */
+.tips { padding: 6px 4px 0; }
+.tips ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--ink-2); font-size: 14.5px; max-width: 64ch; }
+.tips li::marker { color: var(--accent); }
+.tips strong { color: var(--ink); font-weight: 600; }
+
+@media (max-width: 420px) {
+  .chord { font-size: 64px; }
+  .facts { grid-template-columns: 1.2fr .8fr 1fr; gap: 8px; }
+  .key { margin-left: 0; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<main class="app">
+  <header class="top">
+    <h1 class="brand">Chord Ear</h1>
+    <p class="tagline">Play something. See the chord.</p>
+  </header>
+
+  <section class="panel stage" aria-label="Current chord">
+    <div class="wheel-wrap">
+      <svg id="wheel" viewBox="0 0 320 320" role="img" aria-label="Circle of fifths with the notes of the current chord highlighted"></svg>
+      <div class="readout">
+        <div class="chord" id="chord">C</div>
+        <div class="words" id="words" aria-live="polite">C major</div>
+      </div>
+    </div>
+    <dl class="facts">
+      <div><dt>Chord tones</dt><dd id="tones">C E G</dd></div>
+      <div><dt>Bass</dt><dd id="bass">C</dd></div>
+      <div><dt>Match</dt><dd><span class="pill" id="match" data-q="clear">Clear</span></dd></div>
+    </dl>
+  </section>
+
+  <section class="panel" id="livePanel" hidden aria-label="Listen live">
+    <div class="live-row">
+      <button class="btn rec" id="liveBtn" type="button"><span class="dot"></span><span id="liveLbl">Listen</span></button>
+      <div class="level" aria-hidden="true"><i id="lvl"></i></div>
+    </div>
+    <div class="recent" id="recent" aria-label="Recently played chords"></div>
+    <p class="hint" id="liveHint">Press Listen and play. Your browser asks for the microphone once. Listening happens on this computer; nothing is recorded or sent.</p>
+  </section>
+
+  <section class="panel" id="drop" aria-label="Open a recording">
+    <div class="source-row">
+      <input type="file" id="file" class="visually-hidden" accept="audio/*,.m4a,.mp3,.wav,.aac,.flac,.ogg,.caf,.aiff,.mp4,.mov">
+      <label for="file" class="btn primary">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 11a.75.75 0 0 1-.75-.75V4.06L5.03 6.28a.75.75 0 0 1-1.06-1.06l3.5-3.5a.75.75 0 0 1 1.06 0l3.5 3.5a.75.75 0 1 1-1.06 1.06L8.75 4.06v6.19A.75.75 0 0 1 8 11ZM2.75 10.5a.75.75 0 0 1 .75.75V13h9v-1.75a.75.75 0 0 1 1.5 0v2.5a.75.75 0 0 1-.75.75H2.75a.75.75 0 0 1-.75-.75v-2.5a.75.75 0 0 1 .75-.75Z"/></svg>
+        Open a recording
+      </label>
+      <button class="btn ghost" id="sampleBtn" type="button" hidden>Back to the example</button>
+    </div>
+    <p class="hint">Record yourself playing with your phone's voice memo app, then open the file here. Chord Ear works through the whole take and lines every chord up with the audio. The file stays on your device.</p>
+    <div id="statusWrap" hidden>
+      <p class="status" id="status" role="status"></p>
+      <div class="bar" id="barWrap"><i id="bar"></i></div>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="Chord chart">
+    <div class="sheet-head">
+      <span class="tag" id="srcTag">Example</span>
+      <span class="src-name" id="srcName">Synthesized strum, 8 bars</span>
+      <span class="key" id="key"></span>
+    </div>
+    <div class="transport">
+      <button class="play" id="play" type="button" aria-label="Play">
+        <svg viewBox="0 0 18 18" id="playIcon"><path d="M5 3.2v11.6c0 .6.66.97 1.17.65l9.1-5.8a.77.77 0 0 0 0-1.3l-9.1-5.8C5.66 2.23 5 2.6 5 3.2Z"/></svg>
+      </button>
+      <span class="time"><span id="tNow">0:00</span> / <span id="tDur">0:00</span></span>
+    </div>
+    <div class="strip-scroll" id="stripScroll">
+      <div class="strip" id="strip"></div>
+    </div>
+    <div class="used">
+      <h2 class="sub">Chords in this take</h2>
+      <div class="chips" id="chips"></div>
+    </div>
+  </section>
+
+  <section class="tips">
+    <h2 class="sub">Getting a clean read</h2>
+    <ul>
+      <li><strong>One instrument, close to the mic.</strong> Drums, vocals and backing tracks blur the notes.</li>
+      <li><strong>Let chords ring.</strong> Strummed or sustained chords read best; fast single-note runs come out as passing chords.</li>
+      <li><strong>Same notes, different names.</strong> C6 and Am7 share every note, so Chord Ear goes by the lowest note to pick the name. Slash chords like C/E show a bass note other than the root.</li>
+      <li><strong>No sound on an iPhone?</strong> Turn off silent mode. The chart follows along either way.</li>
+      <li><strong>Tuning drift is fine.</strong> It measures how far your instrument sits from A440 and adjusts.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+const ChordCore = (() => {
+  const TYPES = [
+    { id: 'maj',  iv: [0, 4, 7],      prior: 1.000, words: 'major' },
+    { id: 'm',    iv: [0, 3, 7],      prior: 1.000, words: 'minor' },
+    { id: '7',    iv: [0, 4, 7, 10],  prior: 0.975, words: 'seventh' },
+    { id: 'm7',   iv: [0, 3, 7, 10],  prior: 0.975, words: 'minor seventh' },
+    { id: 'maj7', iv: [0, 4, 7, 11],  prior: 0.970, words: 'major seventh' },
+    { id: 'sus4', iv: [0, 5, 7],      prior: 0.955, words: 'suspended fourth' },
+    { id: 'sus2', iv: [0, 2, 7],      prior: 0.950, words: 'suspended second' },
+    { id: '5',    iv: [0, 7],         prior: 0.950, words: 'power chord' },
+    { id: 'dim',  iv: [0, 3, 6],      prior: 0.940, words: 'diminished' },
+    { id: 'm7b5', iv: [0, 3, 6, 10],  prior: 0.940, words: 'half-diminished' },
+    { id: 'aug',  iv: [0, 4, 8],      prior: 0.920, words: 'augmented' },
+  ];
+  const NT = TYPES.length;
+  const NCH = 12 * NT;          // chord states; index NCH = no chord
+  const HARM = [[0, 1], [0, 0.6], [7, 0.36], [0, 0.216], [4, 0.13], [7, 0.078]];
+
+  // chord list + centered, unit-norm templates (harmonics folded in)
+  const CHORDS = [];
+  const TPL = [];
+  for (let t = 0; t < NT; t++) {
+    for (let r = 0; r < 12; r++) {
+      const pcs = TYPES[t].iv.map(i => (r + i) % 12);
+      const v = new Float64Array(12);
+      for (const p of pcs) for (const [o, w] of HARM) v[(p + o) % 12] += w;
+      let mean = 0; for (let i = 0; i < 12; i++) mean += v[i]; mean /= 12;
+      let n = 0; for (let i = 0; i < 12; i++) { v[i] -= mean; n += v[i] * v[i]; }
+      n = Math.sqrt(n); for (let i = 0; i < 12; i++) v[i] /= n;
+      CHORDS.push({ root: r, type: TYPES[t].id, pcs, prior: TYPES[t].prior, ti: t });
+      TPL.push(v);
+    }
+  }
+
+  // ---------- FFT ----------
+  function makeFFT(N) {
+    const L = Math.round(Math.log2(N));
+    const rev = new Uint32Array(N);
+    for (let i = 0; i < N; i++) { let x = i, y = 0; for (let j = 0; j < L; j++) { y = (y << 1) | (x & 1); x >>= 1; } rev[i] = y; }
+    const c = new Float64Array(N / 2), s = new Float64Array(N / 2);
+    for (let i = 0; i < N / 2; i++) { c[i] = Math.cos(2 * Math.PI * i / N); s[i] = Math.sin(2 * Math.PI * i / N); }
+    const re = new Float64Array(N), im = new Float64Array(N);
+    const win = new Float64Array(N);
+    for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
+    const mag = new Float64Array(N / 2 + 1);
+    return function (x, off) {
+      im.fill(0);
+      for (let i = 0; i < N; i++) re[rev[i]] = (x[off + i] || 0) * win[i];
+      for (let size = 2; size <= N; size <<= 1) {
+        const half = size >> 1, step = N / size;
+        for (let i = 0; i < N; i += size) {
+          for (let j = 0, k = 0; j < half; j++, k += step) {
+            const a = i + j, b = a + half;
+            const tr = re[b] * c[k] + im[b] * s[k];
+            const ti = im[b] * c[k] - re[b] * s[k];
+            re[b] = re[a] - tr; im[b] = im[a] - ti;
+            re[a] += tr; im[a] += ti;
+          }
+        }
+      }
+      for (let k = 0; k <= N / 2; k++) mag[k] = Math.hypot(re[k], im[k]);
+      return mag;
+    };
+  }
+
+  // ---------- spectral peaks ----------
+  const F_LO = 50, F_HI = 2500;
+  function findPeaks(mag, binHz) {
+    const kLo = Math.max(2, Math.floor(F_LO / binHz));
+    const kHi = Math.min(mag.length - 2, Math.ceil(F_HI / binHz));
+    let max = 0;
+    for (let k = kLo; k <= kHi; k++) if (mag[k] > max) max = mag[k];
+    const out = [];
+    if (max <= 0) return out;
+    const th = max * 0.0316; // -30 dB relative to the strongest peak
+    for (let k = kLo; k <= kHi; k++) {
+      const m = mag[k];
+      if (m > th && m > mag[k - 1] && m >= mag[k + 1]) {
+        const a = Math.log(mag[k - 1] + 1e-12), b = Math.log(m + 1e-12), cc = Math.log(mag[k + 1] + 1e-12);
+        const d = a - 2 * b + cc;
+        const p = d < 0 ? 0.5 * (a - cc) / d : 0;
+        out.push((k + p) * binHz, m / max);
+      }
+    }
+    return out; // flat [f0, r0, f1, r1, ...]
+  }
+
+  function tuningVector(peaks, acc) {
+    for (let i = 0; i < peaks.length; i += 2) {
+      const r = peaks[i + 1];
+      if (r < 0.1) continue;
+      const midi = 69 + 12 * Math.log2(peaks[i] / 440);
+      const dev = midi - Math.round(midi);
+      acc[0] += r * Math.cos(2 * Math.PI * dev);
+      acc[1] += r * Math.sin(2 * Math.PI * dev);
+    }
+    return acc;
+  }
+  const tuningFrom = acc => (acc[0] === 0 && acc[1] === 0) ? 0 : Math.atan2(acc[1], acc[0]) / (2 * Math.PI);
+
+  // chroma (12) + bass vote (12) from peaks
+  function chromaFrom(peaks, tuning, chroma, bass) {
+    chroma.fill(0); bass.fill(0);
+    let lowMax = 0;
+    for (let i = 0; i < peaks.length; i += 2) if (peaks[i] < 300 && peaks[i + 1] > lowMax) lowMax = peaks[i + 1];
+    let bassDone = false;
+    for (let i = 0; i < peaks.length; i += 2) {
+      const f = peaks[i], r = peaks[i + 1];
+      const midi = 69 + 12 * Math.log2(f / 440) - tuning;
+      const n = Math.round(midi);
+      const dev = midi - n;
+      let w = Math.cos(Math.PI * dev); w *= w;
+      const pc = ((n % 12) + 12) % 12;
+      const v = Math.sqrt(r) * w;
+      chroma[pc] += v;
+      // bass = lowest reasonably strong peak below ~D4
+      if (!bassDone && f < 300 && r >= 0.15 * lowMax && w > 0.5) { bass[pc] += Math.sqrt(r); bassDone = true; }
+    }
+  }
+
+  // ---------- chord scoring ----------
+  const BASS_BONUS = 0.05;
+  function scoreChroma(chroma, bass, out) {
+    let mean = 0; for (let i = 0; i < 12; i++) mean += chroma[i]; mean /= 12;
+    let n = 0; const c = scoreChroma._c || (scoreChroma._c = new Float64Array(12));
+    for (let i = 0; i < 12; i++) { c[i] = chroma[i] - mean; n += c[i] * c[i]; }
+    n = Math.sqrt(n);
+    if (n < 1e-9) { out.fill(0); return out; }
+    let bsum = 0, bmax = 0, bpc = -1;
+    for (let i = 0; i < 12; i++) { bsum += bass[i]; if (bass[i] > bmax) { bmax = bass[i]; bpc = i; } }
+    const clarity = bsum > 0 ? bmax / bsum : 0;
+    for (let ci = 0; ci < NCH; ci++) {
+      const t = TPL[ci]; let d = 0;
+      for (let i = 0; i < 12; i++) d += c[i] * t[i];
+      let s = (d / n) * CHORDS[ci].prior;
+      if (clarity > 0.4 && CHORDS[ci].root === bpc) s += BASS_BONUS * clarity;
+      out[ci] = s;
+    }
+    return out;
+  }
+
+  // ---------- key ----------
+  const KK_MAJ = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+  const KK_MIN = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+  function corr(a, b) {
+    let ma = 0, mb = 0; for (let i = 0; i < 12; i++) { ma += a[i]; mb += b[i]; } ma /= 12; mb /= 12;
+    let num = 0, da = 0, db = 0;
+    for (let i = 0; i < 12; i++) { const x = a[i] - ma, y = b[i] - mb; num += x * y; da += x * x; db += y * y; }
+    return da && db ? num / Math.sqrt(da * db) : 0;
+  }
+  function estimateKey(total) {
+    let best = { tonic: 0, mode: 'major', r: -2 };
+    for (let k = 0; k < 12; k++) {
+      const rot = Array.from({ length: 12 }, (_, i) => total[(i + k) % 12]);
+      const rM = corr(rot, KK_MAJ), rm = corr(rot, KK_MIN);
+      if (rM > best.r) best = { tonic: k, mode: 'major', r: rM };
+      if (rm > best.r) best = { tonic: k, mode: 'minor', r: rm };
+    }
+    return best;
+  }
+
+  // ---------- whole-recording analysis ----------
+  const SWITCH_PENALTY = 0.45;
+  const MIN_SEG = 0.4; // seconds
+  const yieldUI = () => new Promise(r => setTimeout(r, 0));
+
+  async function analyze(x, sr, onProgress) {
+    let N = 1; while (N < sr * 0.37) N <<= 1;
+    const hop = N >> 2;
+    const binHz = sr / N;
+    const fft = makeFFT(N);
+    const frames = Math.max(1, Math.floor((x.length - N) / hop) + 1);
+    const hopSec = hop / sr;
+    const peaksAll = new Array(frames);
+    const rmsDb = new Float32Array(frames);
+
+    // pass 1: spectra -> peaks
+    let maxDb = -200;
+    for (let f = 0; f < frames; f++) {
+      const off = f * hop;
+      let e = 0; for (let i = 0; i < N; i++) { const v = x[off + i] || 0; e += v * v; }
+      const db = 10 * Math.log10(e / N + 1e-12);
+      rmsDb[f] = db; if (db > maxDb) maxDb = db;
+      peaksAll[f] = findPeaks(fft(x, off), binHz);
+      if (f % 40 === 39) { onProgress && onProgress(0.85 * f / frames); await yieldUI(); }
+    }
+    const gate = Math.max(-62, maxDb - 32);
+    const silent = new Uint8Array(frames);
+    for (let f = 0; f < frames; f++) silent[f] = rmsDb[f] < gate ? 1 : 0;
+
+    // tuning from loud frames
+    const tacc = [0, 0];
+    for (let f = 0; f < frames; f++) if (rmsDb[f] > maxDb - 20) tuningVector(peaksAll[f], tacc);
+    const tuning = tuningFrom(tacc);
+
+    // pass 2: chroma + bass
+    const rawC = new Float32Array(frames * 12), rawB = new Float32Array(frames * 12);
+    const ch = new Float64Array(12), bs = new Float64Array(12);
+    for (let f = 0; f < frames; f++) {
+      if (silent[f]) continue;
+      chromaFrom(peaksAll[f], tuning, ch, bs);
+      for (let i = 0; i < 12; i++) { rawC[f * 12 + i] = ch[i]; rawB[f * 12 + i] = bs[i]; }
+    }
+    // smooth +/-1 frame (chroma) and +/-2 (bass votes)
+    const C = new Float32Array(frames * 12), B = new Float32Array(frames * 12);
+    for (let f = 0; f < frames; f++) {
+      for (let i = 0; i < 12; i++) {
+        let s = 0, sb = 0;
+        for (let d = -2; d <= 2; d++) {
+          const g = f + d; if (g < 0 || g >= frames) continue;
+          if (d >= -1 && d <= 1) s += rawC[g * 12 + i] * (d === 0 ? 2 : 1);
+          sb += rawB[g * 12 + i];
+        }
+        C[f * 12 + i] = s; B[f * 12 + i] = sb;
+      }
+    }
+    // per-frame display chroma normalized 0..1
+    const disp = new Float32Array(frames * 12);
+    const total = new Float64Array(12);
+    for (let f = 0; f < frames; f++) {
+      if (silent[f]) continue;
+      let m = 0; for (let i = 0; i < 12; i++) m = Math.max(m, C[f * 12 + i]);
+      if (m > 0) for (let i = 0; i < 12; i++) { disp[f * 12 + i] = C[f * 12 + i] / m; total[i] += C[f * 12 + i] / m; }
+    }
+
+    // scores + Viterbi
+    const S = NCH + 1;
+    const scores = new Float32Array(frames * S);
+    const tmp = new Float64Array(NCH);
+    for (let f = 0; f < frames; f++) {
+      if (silent[f]) { scores[f * S + NCH] = 0.6; continue; }
+      scoreChroma(C.subarray(f * 12, f * 12 + 12), B.subarray(f * 12, f * 12 + 12), tmp);
+      for (let ci = 0; ci < NCH; ci++) scores[f * S + ci] = tmp[ci];
+      scores[f * S + NCH] = 0.25;
+    }
+    onProgress && onProgress(0.92); await yieldUI();
+    let dp = new Float64Array(S), nd = new Float64Array(S);
+    const back = new Uint16Array(frames * S);
+    for (let s = 0; s < S; s++) dp[s] = scores[s];
+    for (let f = 1; f < frames; f++) {
+      let bi = 0; for (let s = 1; s < S; s++) if (dp[s] > dp[bi]) bi = s;
+      const sw = dp[bi] - SWITCH_PENALTY;
+      for (let s = 0; s < S; s++) {
+        if (dp[s] >= sw) { nd[s] = dp[s] + scores[f * S + s]; back[f * S + s] = s; }
+        else { nd[s] = sw + scores[f * S + s]; back[f * S + s] = bi; }
+      }
+      const t = dp; dp = nd; nd = t;
+    }
+    const path = new Uint16Array(frames);
+    let bi = 0; for (let s = 1; s < S; s++) if (dp[s] > dp[bi]) bi = s;
+    path[frames - 1] = bi;
+    for (let f = frames - 1; f > 0; f--) path[f - 1] = back[f * S + path[f]];
+
+    // segments (frame f is centred at (f*hop + N/2)/sr)
+    const tOf = f => (f * hop + N / 2) / sr;
+    let segs = [];
+    for (let f = 0; f < frames; f++) {
+      if (segs.length && segs[segs.length - 1].ci === path[f]) segs[segs.length - 1].f1 = f;
+      else segs.push({ ci: path[f], f0: f, f1: f });
+    }
+    // absorb very short segments
+    let changed = true;
+    while (changed && segs.length > 1) {
+      changed = false;
+      for (let i = 0; i < segs.length; i++) {
+        const s = segs[i];
+        if ((s.f1 - s.f0 + 1) * hopSec >= MIN_SEG) continue;
+        const prev = segs[i - 1], next = segs[i + 1];
+        const into = !prev ? next : !next ? prev : ((prev.f1 - prev.f0) >= (next.f1 - next.f0) ? prev : next);
+        if (into === prev) prev.f1 = s.f1; else next.f0 = s.f0;
+        segs.splice(i, 1); changed = true; break;
+      }
+      // merge equal neighbours
+      for (let i = segs.length - 1; i > 0; i--) if (segs[i].ci === segs[i - 1].ci) { segs[i - 1].f1 = segs[i].f1; segs.splice(i, 1); }
+    }
+
+    const duration = x.length / sr;
+    const out = segs.map((s, i) => {
+      const start = i === 0 ? 0 : tOf(s.f0) - hopSec / 2;
+      const end = i === segs.length - 1 ? duration : tOf(s.f1) + hopSec / 2;
+      const seg = { start: Math.max(0, start), end: Math.min(duration, end), f0: s.f0, f1: s.f1, chord: null, score: 0, avg: new Float32Array(12) };
+      if (s.ci === NCH) return seg;
+      const ch = CHORDS[s.ci];
+      // average score, display chroma and bass votes
+      let sc = 0; const bv = new Float64Array(12);
+      for (let f = s.f0; f <= s.f1; f++) {
+        sc += scores[f * S + s.ci];
+        for (let i = 0; i < 12; i++) { seg.avg[i] += disp[f * 12 + i]; bv[i] += B[f * 12 + i]; }
+      }
+      const nf = s.f1 - s.f0 + 1;
+      let am = 0; for (let i = 0; i < 12; i++) am = Math.max(am, seg.avg[i]);
+      if (am > 0) for (let i = 0; i < 12; i++) seg.avg[i] /= am;
+      let bsum = 0, bmax = 0, bpc = -1;
+      for (let i = 0; i < 12; i++) { bsum += bv[i]; if (bv[i] > bmax) { bmax = bv[i]; bpc = i; } }
+      let bass = null;
+      if (bsum > 0 && bmax / bsum > 0.45 && bpc !== ch.root && ch.pcs.includes(bpc) && ch.type !== '5') bass = bpc;
+      seg.chord = { root: ch.root, type: ch.type, pcs: ch.pcs, bass, bassPc: bsum > 0 ? bpc : null };
+      seg.score = Math.max(0, Math.min(1, sc / nf));
+      return seg;
+    });
+    // key from the chords found (avoids the harmonic bias of raw chroma)
+    const kh = new Float64Array(12); let any = false;
+    for (const sg of out) if (sg.chord) { any = true; const d = sg.end - sg.start; for (const p of sg.chord.pcs) kh[p] += d * (p === sg.chord.root ? 1.3 : 1); }
+    onProgress && onProgress(1);
+    return { segments: out, frames, hopSec, frameT0: N / 2 / sr, disp, silent, duration, tuning, key: estimateKey(any ? kh : total) };
+  }
+
+  // ---------- live helpers ----------
+  function makeLive() {
+    const ch = new Float64Array(12), bs = new Float64Array(12);
+    const sm = new Float64Array(12), sb = new Float64Array(12);
+    const sc = new Float64Array(NCH);
+    const tacc = [0, 0];
+    return {
+      // mag: linear magnitudes; returns {disp, best, score, bassPc}
+      step(mag, binHz, loud) {
+        const peaks = findPeaks(mag, binHz);
+        if (loud) { const t = tuningVector(peaks, [0, 0]); tacc[0] = tacc[0] * 0.98 + t[0]; tacc[1] = tacc[1] * 0.98 + t[1]; }
+        chromaFrom(peaks, tuningFrom(tacc), ch, bs);
+        let m = 0; for (let i = 0; i < 12; i++) m = Math.max(m, ch[i]);
+        for (let i = 0; i < 12; i++) { sm[i] = sm[i] * 0.55 + (m > 0 ? ch[i] / m : 0) * 0.45; sb[i] = sb[i] * 0.8 + bs[i] * 0.2; }
+        scoreChroma(sm, sb, sc);
+        let bi = 0; for (let i = 1; i < NCH; i++) if (sc[i] > sc[bi]) bi = i;
+        let bsum = 0, bmax = 0, bpc = -1;
+        for (let i = 0; i < 12; i++) { bsum += sb[i]; if (sb[i] > bmax) { bmax = sb[i]; bpc = i; } }
+        const c = CHORDS[bi];
+        let bass = null;
+        if (bsum > 0 && bmax / bsum > 0.5 && bpc !== c.root && c.pcs.includes(bpc) && c.type !== '5') bass = bpc;
+        let dm = 0; for (let i = 0; i < 12; i++) dm = Math.max(dm, sm[i]);
+        const disp = Array.from(sm, v => dm > 0 ? v / dm : 0);
+        return { id: bi * 12 + (bass == null ? 12 : bass), chord: { root: c.root, type: c.type, pcs: c.pcs, bass, bassPc: bsum > 0 ? bpc : null }, score: Math.max(0, sc[bi]), disp };
+      },
+      decay() { for (let i = 0; i < 12; i++) { sm[i] *= 0.8; sb[i] *= 0.8; } return Array.from(sm); },
+    };
+  }
+
+  // ---------- synthesized sample ----------
+  const VOICINGS = {
+    C: [48, 52, 55, 60, 64], Am7: [45, 52, 55, 60, 64], Dm7: [50, 57, 60, 65], G7: [43, 47, 50, 55, 59, 65],
+    Em: [40, 47, 52, 55, 59, 64], F: [41, 48, 53, 57, 60, 65], G: [43, 47, 50, 55, 62, 67], Am: [45, 52, 57, 60, 64],
+    D: [50, 57, 62, 66], E7: [40, 47, 50, 56, 59, 64], Cmaj7: [48, 52, 55, 59, 64], Dsus4: [50, 57, 62, 67],
+    Bm: [47, 54, 59, 62, 66], Fmaj7: [53, 57, 60, 64], E5: [40, 47, 52], Bdim: [47, 53, 59, 62], 'C/E': [40, 48, 52, 55, 60, 64],
+    Asus2: [45, 52, 57, 59, 64], Bm7b5: [47, 53, 57, 62], Caug: [48, 52, 56, 60], A: [45, 52, 57, 61, 64], E: [40, 47, 52, 56, 59, 64],
+  };
+  function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+  function synth(prog, sr, secPerChord, opts = {}) {
+    const rand = rng(opts.seed || 7);
+    const len = Math.ceil((prog.length * secPerChord + 0.6) * sr);
+    const x = new Float32Array(len);
+    const strums = opts.strums || [0, 0.5];
+    prog.forEach((name, ci) => {
+      const notes = VOICINGS[name];
+      const t0 = ci * secPerChord;
+      const tEnd = (ci + 1) * secPerChord + (ci === prog.length - 1 ? 0.5 : 0.03);
+      strums.forEach((frac, si) => {
+        const ts = t0 + frac * secPerChord;
+        const up = si % 2 === 1;
+        const order = up ? [...notes].reverse() : notes;
+        order.forEach((midi, j) => {
+          const on = ts + j * 0.014 + rand() * 0.004;
+          const amp = (up ? 0.11 : 0.15) * (0.85 + 0.3 * rand());
+          const f0 = 440 * Math.pow(2, (midi - 69) / 12);
+          const n0 = Math.floor(on * sr);
+          const nEnd = Math.min(len, Math.floor(tEnd * sr));
+          for (let h = 1; h <= 10; h++) {
+            const fh = f0 * h * Math.sqrt(1 + 0.00008 * h * h);
+            if (fh > sr * 0.45) break;
+            const ah = amp / Math.pow(h, 1.05) * (h === 2 ? 1.1 : 1);
+            const tau = 1.8 / (1 + 0.45 * (h - 1));
+            const ph = rand() * 6.283;
+            const w = 2 * Math.PI * fh / sr;
+            for (let n = n0; n < nEnd; n++) {
+              const t = (n - n0) / sr;
+              let env = Math.exp(-t / tau);
+              if (t < 0.004) env *= t / 0.004;
+              const rem = (nEnd - n) / sr; if (rem < 0.03) env *= rem / 0.03;
+              x[n] += ah * env * Math.sin(w * (n - n0) + ph);
+            }
+          }
+        });
+      });
+    });
+    if (opts.noise) for (let n = 0; n < len; n++) x[n] += (rand() * 2 - 1) * opts.noise;
+    let m = 0; for (let n = 0; n < len; n++) m = Math.max(m, Math.abs(x[n]));
+    if (m > 0) for (let n = 0; n < len; n++) x[n] *= 0.8 / m;
+    return x;
+  }
+
+  return { TYPES, CHORDS, analyze, makeLive, synth, VOICINGS };
+})();
+
+</script>
+<script>
+(() => {
+  const LIVE = true;
+  const $ = id => document.getElementById(id);
+  const SHARP = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+  const FLAT = ['C','D♭','D','E♭','E','F','G♭','G','A♭','A','B♭','B'];
+  const COMMON = ['C','C♯','D','E♭','E','F','F♯','G','A♭','A','B♭','B'];
+  const ORDER = [0,7,2,9,4,11,6,1,8,3,10,5];
+  const WORDS = Object.fromEntries(ChordCore.TYPES.map(t => [t.id, t.words]));
+  const PPS = 54, MINW = 62;
+  const S = { sp: COMMON, res: null, playBuf: null, isSample: true, name: '', segIdx: -1, segEls: [], segX: [], sample: null, sampleRes: null, sampleBuf: null };
+
+  const spellingFor = key => {
+    if (!key) return COMMON;
+    const flats = key.mode === 'major' ? [5,10,3,8,1] : [2,7,0,5,10,3];
+    return flats.includes(key.tonic) ? FLAT : SHARP;
+  };
+  const fmt = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = Math.floor(t % 60); return m + ':' + String(s).padStart(2, '0'); };
+  const accHTML = s => s.replace(/([♯♭])/g, '<span class="acc">$1</span>');
+
+  function chordParts(c) {
+    let base = '', sup = '';
+    switch (c.type) {
+      case 'm': base = 'm'; break;
+      case '7': sup = '7'; break;
+      case 'm7': base = 'm'; sup = '7'; break;
+      case 'maj7': sup = 'maj7'; break;
+      case 'sus4': sup = 'sus4'; break;
+      case 'sus2': sup = 'sus2'; break;
+      case '5': sup = '5'; break;
+      case 'dim': base = '°'; break;
+      case 'm7b5': base = 'm'; sup = '7♭5'; break;
+      case 'aug': base = '+'; break;
+    }
+    return { base, sup };
+  }
+  function chordHTML(c, big) {
+    if (!c) return '<span class="nc">N.C.</span>';
+    const { base, sup } = chordParts(c);
+    const a = big ? accHTML : (s => s);
+    return a(S.sp[c.root]) + base + (sup ? '<sup>' + a(sup) + '</sup>' : '') + (c.bass != null ? '<span class="slash">/</span>' + a(S.sp[c.bass]) : '');
+  }
+  function chordText(c) {
+    if (!c) return 'N.C.';
+    const { base, sup } = chordParts(c);
+    return S.sp[c.root] + base + sup + (c.bass != null ? '/' + S.sp[c.bass] : '');
+  }
+  function chordWords(c) {
+    if (!c) return 'No chord';
+    let w = c.type === '5' ? S.sp[c.root] + ' power chord' : S.sp[c.root] + ' ' + WORDS[c.type];
+    if (c.bass != null) w += ', ' + S.sp[c.bass] + ' in the bass';
+    return w;
+  }
+  const keyName = k => {
+    const sp = spellingFor(k);
+    return sp[k.tonic] + (k.mode === 'major' ? ' major' : ' minor');
+  };
+
+  // ---------- wheel ----------
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const R = 118, NR = 21;
+  const nodes = [];
+  let shape;
+  function el(tag, attrs, parent) { const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+  function buildWheel() {
+    const w = $('wheel');
+    el('circle', { cx: 160, cy: 160, r: R, class: 'ring' }, w);
+    shape = el('polygon', { class: 'shape', points: '' }, w);
+    ORDER.forEach((pc, i) => {
+      const a = (-90 + i * 30) * Math.PI / 180;
+      const x = 160 + R * Math.cos(a), y = 160 + R * Math.sin(a);
+      const g = el('g', { class: 'node' }, w);
+      el('circle', { cx: x, cy: y, r: NR, class: 'base' }, g);
+      const glow = el('circle', { cx: x, cy: y, r: NR, class: 'glow' }, g);
+      const t = el('text', { x, y: y + 0.5, class: 'nm' }, g);
+      const bd = el('circle', { cx: 160 + (R + 30) * Math.cos(a), cy: 160 + (R + 30) * Math.sin(a), r: 4.2, class: 'bassdot' }, w);
+      nodes[pc] = { g, glow, t, x, y, bd };
+    });
+  }
+  function labelWheel() { for (let pc = 0; pc < 12; pc++) nodes[pc].t.textContent = S.sp[pc]; }
+  let lastShape = '';
+  function paintWheel(disp, c) {
+    const tones = c ? c.pcs : [];
+    for (let pc = 0; pc < 12; pc++) {
+      const n = nodes[pc], v = disp ? disp[pc] : 0;
+      n.glow.style.fillOpacity = (0.05 + 0.4 * v * v).toFixed(3);
+      n.g.classList.toggle('tone', tones.includes(pc));
+      n.g.classList.toggle('root', !!c && c.root === pc);
+      n.bd.classList.toggle('on', !!c && c.bassPc === pc);
+    }
+    const pts = tones.slice().sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b)).map(pc => nodes[pc].x.toFixed(1) + ',' + nodes[pc].y.toFixed(1)).join(' ');
+    if (pts !== lastShape) { shape.setAttribute('points', pts); lastShape = pts; }
+  }
+
+  // ---------- readout ----------
+  function showChord(c, score) {
+    const ch = $('chord');
+    ch.innerHTML = chordHTML(c, true);
+    const len = chordText(c).length;
+    const base = window.innerWidth <= 420 ? 64 : 72;
+    ch.style.fontSize = (len <= 3 ? base : len <= 4 ? base * 0.86 : len <= 6 ? base * 0.72 : base * 0.58) + 'px';
+    $('words').textContent = chordWords(c);
+    $('tones').textContent = c ? c.pcs.map(p => S.sp[p]).join('  ') : '—';
+    $('bass').textContent = c && c.bassPc != null ? S.sp[c.bassPc] : '—';
+    const m = $('match');
+    if (!c) { m.dataset.q = 'none'; m.textContent = '—'; }
+    else if (score >= 0.85) { m.dataset.q = 'clear'; m.textContent = 'Clear'; }
+    else if (score >= 0.65) { m.dataset.q = 'likely'; m.textContent = 'Likely'; }
+    else { m.dataset.q = 'unsure'; m.textContent = 'Unsure'; }
+  }
+  function showListening() {
+    $('chord').innerHTML = '<span class="nc">…</span>';
+    $('words').textContent = 'Listening';
+    $('tones').textContent = '—'; $('bass').textContent = '—';
+    const m = $('match'); m.dataset.q = 'none'; m.textContent = '—';
+  }
+
+  // ---------- status ----------
+  function setStatus(text, progress, err) {
+    $('statusWrap').hidden = !text;
+    $('status').textContent = text || '';
+    $('status').classList.toggle('err', !!err);
+    $('barWrap').hidden = progress == null;
+    if (progress != null) $('bar').style.width = Math.round(progress * 100) + '%';
+  }
+
+  // ---------- chart ----------
+  function renderSheet() {
+    const r = S.res;
+    S.sp = spellingFor(r.key.r > 0.5 ? r.key : null);
+    labelWheel();
+    $('srcTag').textContent = S.isSample ? 'Example' : 'Your recording';
+    $('srcName').textContent = S.isSample ? 'Synthesized strum, 8 bars' : S.name;
+    $('key').textContent = r.segments.some(s => s.chord) ? (r.key.r > 0.5 ? 'Likely key: ' + keyName(r.key) : 'Key unclear') : '';
+    $('tDur').textContent = fmt(r.duration);
+    $('sampleBtn').hidden = S.isSample;
+
+    const strip = $('strip');
+    strip.textContent = '';
+    S.segEls = []; S.segX = [];
+    let x = 0;
+    r.segments.forEach((sg, i) => {
+      const w = Math.max(MINW, (sg.end - sg.start) * PPS);
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'seg'; b.style.width = w + 'px';
+      b.innerHTML = '<span class="lbl">' + chordHTML(sg.chord, false) + '</span><span class="at">' + fmt(sg.start) + '</span>';
+      b.setAttribute('aria-label', chordWords(sg.chord) + ' at ' + fmt(sg.start));
+      b.addEventListener('click', () => seek(sg.start + 0.001));
+      strip.appendChild(b);
+      S.segEls.push(b); S.segX.push([x, w]);
+      x += w;
+    });
+    const ph = document.createElement('div'); ph.className = 'playhead'; ph.id = 'playhead';
+    strip.appendChild(ph);
+    $('stripScroll').scrollLeft = 0;
+
+    // chips: unique chords in order of first appearance
+    const chips = $('chips'); chips.textContent = '';
+    const seen = new Map();
+    r.segments.forEach((sg, i) => {
+      if (!sg.chord) return;
+      const k = chordText(sg.chord);
+      if (!seen.has(k)) seen.set(k, { c: sg.chord, n: 0, i });
+      seen.get(k).n++;
+    });
+    if (!seen.size) chips.innerHTML = '<span class="hint" style="margin:0">No chords found in this take.</span>';
+    for (const [k, v] of seen) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'chip';
+      b.innerHTML = '<span class="lbl">' + chordHTML(v.c, false) + '</span>' + (v.n > 1 ? '<span class="n">×' + v.n + '</span>' : '');
+      b.setAttribute('aria-label', chordWords(v.c) + (v.n > 1 ? ', played ' + v.n + ' times' : '') + '. Jump to first');
+      b.addEventListener('click', () => { seek(r.segments[v.i].start + 0.001); scrollToSeg(v.i, true); });
+      chips.appendChild(b);
+    }
+    S.segIdx = -1; offset = 0;
+    showAt(0, true);
+  }
+  function segAt(t) {
+    const segs = S.res.segments;
+    let i = S.segIdx >= 0 ? S.segIdx : 0;
+    if (t >= segs[i].start && t < segs[i].end) return i;
+    if (i + 1 < segs.length && t >= segs[i + 1].start && t < segs[i + 1].end) return i + 1;
+    for (let j = 0; j < segs.length; j++) if (t < segs[j].end) return j;
+    return segs.length - 1;
+  }
+  function scrollToSeg(i, center) {
+    const sc = $('stripScroll'), [x, w] = S.segX[i];
+    if (center) sc.scrollLeft = x - sc.clientWidth * 0.3;
+  }
+  function showAt(t, force) {
+    const r = S.res; if (!r) return;
+    const i = segAt(t), sg = r.segments[i];
+    if (i !== S.segIdx || force) {
+      if (S.segEls[S.segIdx]) S.segEls[S.segIdx].classList.remove('on');
+      S.segEls[i].classList.add('on');
+      S.segIdx = i;
+      if (!live) showChord(sg.chord, sg.score);
+    }
+    if (!live) {
+      let disp = sg.avg;
+      if (playing) {
+        const f = Math.min(r.frames - 1, Math.max(0, Math.round((t - r.frameT0) / r.hopSec)));
+        disp = r.silent[f] ? null : r.disp.subarray(f * 12, f * 12 + 12);
+      }
+      paintWheel(disp, sg.chord);
+    }
+    const [x, w] = S.segX[i];
+    const px = x + Math.min(1, Math.max(0, (t - sg.start) / Math.max(0.01, sg.end - sg.start))) * w;
+    $('playhead').style.transform = 'translateX(' + px.toFixed(1) + 'px)';
+    $('tNow').textContent = fmt(t);
+    if (playing) {
+      const sc = $('stripScroll');
+      if (px < sc.scrollLeft + 24 || px > sc.scrollLeft + sc.clientWidth - 60) sc.scrollLeft = px - sc.clientWidth * 0.25;
+    }
+  }
+
+  // ---------- audio ----------
+  let actx = null, srcNode = null, playing = false, startAt = 0, offset = 0, raf = 0;
+  function ctx() {
+    if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; actx = new AC(); }
+    return actx;
+  }
+  function playBuffer() {
+    if (S.playBuf) return S.playBuf;
+    if (S.isSample) {
+      if (!S.sampleBuf) {
+        const b = ctx().createBuffer(1, S.sample.x.length, S.sample.sr);
+        b.getChannelData(0).set(S.sample.x);
+        S.sampleBuf = b;
+      }
+      return S.sampleBuf;
+    }
+    return null;
+  }
+  const PLAY_D = 'M5 3.2v11.6c0 .6.66.97 1.17.65l9.1-5.8a.77.77 0 0 0 0-1.3l-9.1-5.8C5.66 2.23 5 2.6 5 3.2Z';
+  const PAUSE_D = 'M4.5 3h3v12h-3zM10.5 3h3v12h-3z';
+  function setPlayUI() {
+    $('playIcon').innerHTML = '<path d="' + (playing ? PAUSE_D : PLAY_D) + '"/>';
+    $('play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  }
+  async function play() {
+    if (!S.res) return;
+    if (live) stopLive();
+    const c = ctx();
+    try { await c.resume(); } catch (e) {}
+    const b = playBuffer(); if (!b) return;
+    if (offset >= Math.min(b.duration, S.res.duration) - 0.05) offset = 0;
+    const node = c.createBufferSource();
+    node.buffer = b; node.connect(c.destination);
+    node.onended = () => { if (srcNode === node && playing) { pause(); offset = 0; showAt(0, true); } };
+    node.start(0, offset);
+    srcNode = node; startAt = c.currentTime - offset; playing = true;
+    setPlayUI();
+    cancelAnimationFrame(raf);
+    const loop = () => {
+      if (!playing) return;
+      const t = actx.currentTime - startAt;
+      if (t >= S.res.duration) { pause(); offset = 0; showAt(0, true); return; }
+      showAt(t);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+  }
+  function pause() {
+    if (!playing) return;
+    offset = actx.currentTime - startAt;
+    playing = false;
+    if (srcNode) { srcNode.onended = null; try { srcNode.stop(); } catch (e) {} srcNode = null; }
+    cancelAnimationFrame(raf);
+    setPlayUI();
+    showAt(offset, true);
+  }
+  function seek(t) {
+    const was = playing;
+    if (was) pause();
+    offset = t;
+    showAt(t, true);
+    if (was) play();
+  }
+  $('play').addEventListener('click', () => playing ? pause() : play());
+
+  // ---------- files ----------
+  function readFile(f) {
+    if (f.arrayBuffer) return f.arrayBuffer();
+    return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error); fr.readAsArrayBuffer(f); });
+  }
+  function decode(c, ab) {
+    return new Promise((res, rej) => {
+      let done = false;
+      const ok = b => { if (!done) { done = true; res(b); } };
+      const bad = e => { if (!done) { done = true; rej(e || new Error('decode')); } };
+      try { const p = c.decodeAudioData(ab, ok, bad); if (p && p.then) p.then(ok, bad); } catch (e) { bad(e); }
+    });
+  }
+  let busy = false;
+  async function openFile(f) {
+    if (!f || busy) return;
+    busy = true;
+    pause(); if (live) stopLive();
+    setStatus('Reading ' + f.name + '…', 0.02);
+    try {
+      const ab = await readFile(f);
+      const buf = await decode(ctx(), ab);
+      const MAX = 15 * 60;
+      const dur = Math.min(buf.duration, MAX);
+      const n = Math.floor(dur * buf.sampleRate);
+      const mono = new Float32Array(n), chs = buf.numberOfChannels;
+      for (let ch = 0; ch < chs; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < n; i++) mono[i] += d[i] / chs; }
+      setStatus('Working through ' + fmt(dur) + ' of audio…', 0.05);
+      const res = await ChordCore.analyze(mono, buf.sampleRate, p => setStatus('Working through ' + fmt(dur) + ' of audio…', 0.05 + 0.95 * p));
+      S.res = res; S.playBuf = buf; S.isSample = false; S.name = f.name;
+      renderSheet();
+      if (!res.segments.some(s => s.chord)) setStatus('No chords came through. The take may be too quiet; record again with the phone closer to the instrument.', null, true);
+      else setStatus(buf.duration > MAX ? 'Showing the first 15 minutes of this recording.' : '', null);
+    } catch (e) {
+      setStatus("That file couldn't be read as audio. Try an M4A, MP3 or WAV recording.", null, true);
+    }
+    busy = false;
+  }
+  $('file').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; openFile(f); e.target.value = ''; });
+  const drop = $('drop');
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('drag'); const f = e.dataTransfer && e.dataTransfer.files[0]; openFile(f); });
+  function loadSample() {
+    pause(); if (live) stopLive();
+    S.res = S.sampleRes; S.isSample = true; S.playBuf = null; S.name = '';
+    setStatus('', null);
+    renderSheet();
+  }
+  $('sampleBtn').addEventListener('click', loadSample);
+
+  // ---------- live listening ----------
+  let live = null;
+  async function startLive() {
+    pause();
+    const c = ctx();
+    try { await c.resume(); } catch (e) {}
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    } catch (e) {
+      $('liveHint').textContent = "The microphone is blocked. Allow it for this page in your browser's site settings, then press Listen again.";
+      return;
+    }
+    const an = c.createAnalyser();
+    an.fftSize = c.sampleRate > 60000 ? 32768 : 16384;
+    an.smoothingTimeConstant = 0.5;
+    const src = c.createMediaStreamSource(stream);
+    src.connect(an);
+    const binHz = c.sampleRate / an.fftSize;
+    live = {
+      stream, src, an, binHz, eng: ChordCore.makeLive(),
+      db: new Float32Array(an.frequencyBinCount), mag: new Float64Array(an.frequencyBinCount),
+      td: new Float32Array(an.fftSize), kMax: Math.min(an.frequencyBinCount - 1, Math.ceil(2700 / binHz)),
+      lows: [], pend: -1, pendN: 0, shown: -1, shownChord: null, quiet: 99, hist: [], last: 0, raf: 0,
+    };
+    S.sp = COMMON; labelWheel();
+    $('liveBtn').classList.add('on'); $('liveLbl').textContent = 'Stop';
+    $('liveHint').textContent = 'Listening. Play a chord and let it ring.';
+    if (S.segEls[S.segIdx]) S.segEls[S.segIdx].classList.remove('on');
+    showListening(); paintWheel(null, null);
+    const loop = now => {
+      if (!live) return;
+      live.raf = requestAnimationFrame(loop);
+      if (now - live.last < 70) return;
+      live.last = now;
+      liveStep();
+    };
+    live.raf = requestAnimationFrame(loop);
+  }
+  function liveStep() {
+    const L = live;
+    L.an.getFloatTimeDomainData(L.td);
+    let e = 0; for (let i = 0; i < L.td.length; i++) e += L.td[i] * L.td[i];
+    const rms = 10 * Math.log10(e / L.td.length + 1e-12);
+    L.lows.push(rms); if (L.lows.length > 140) L.lows.shift();
+    const floor = Math.min(-40, Math.min(...L.lows));
+    const loud = rms > Math.max(-60, floor + 9);
+    $('lvl').style.width = Math.max(0, Math.min(100, (rms + 70) / 60 * 100)) + '%';
+    if (!loud) {
+      L.quiet++;
+      paintWheel(L.eng.decay(), L.quiet > 14 ? null : L.shownChord);
+      if (L.quiet === 15) { showListening(); L.shown = -1; L.shownChord = null; L.pend = -1; }
+      return;
+    }
+    L.quiet = 0;
+    L.an.getFloatFrequencyData(L.db);
+    for (let k = 0; k <= L.kMax; k++) { const v = L.db[k]; L.mag[k] = v > -200 ? Math.pow(10, v / 20) : 0; }
+    const r = L.eng.step(L.mag.subarray(0, L.kMax + 2), L.binHz, true);
+    if (r.score >= 0.45) {
+      if (r.id === L.pend) L.pendN++; else { L.pend = r.id; L.pendN = 1; }
+      if (L.pendN >= 3 && r.id !== L.shown) {
+        L.shown = r.id; L.shownChord = r.chord;
+        showChord(r.chord, r.score);
+        L.hist.unshift(r.chord); if (L.hist.length > 8) L.hist.pop();
+        $('recent').innerHTML = L.hist.map(c => '<span class="lbl">' + chordHTML(c, false) + '</span>').join('');
+      } else if (r.id === L.shown) {
+        const m = $('match');
+        const q = r.score >= 0.85 ? 'clear' : r.score >= 0.65 ? 'likely' : 'unsure';
+        if (m.dataset.q !== q) { m.dataset.q = q; m.textContent = q === 'clear' ? 'Clear' : q === 'likely' ? 'Likely' : 'Unsure'; }
+      }
+    }
+    paintWheel(r.disp, L.shownChord);
+  }
+  function stopLive() {
+    if (!live) return;
+    cancelAnimationFrame(live.raf);
+    try { live.src.disconnect(); } catch (e) {}
+    live.stream.getTracks().forEach(t => t.stop());
+    live = null;
+    $('liveBtn').classList.remove('on'); $('liveLbl').textContent = 'Listen';
+    $('lvl').style.width = '0';
+    $('liveHint').textContent = 'Press Listen and play. Listening happens on this computer; nothing is recorded or sent.';
+    if (S.res) { S.sp = spellingFor(S.res.key.r > 0.5 ? S.res.key : null); labelWheel(); showAt(offset, true); }
+  }
+  if (LIVE) {
+    $('livePanel').hidden = false;
+    $('liveBtn').addEventListener('click', () => live ? stopLive() : startLive());
+  }
+
+  // ---------- start with the built-in example ----------
+  buildWheel();
+  labelWheel();
+  paintWheel([1, 0, 0.2, 0, 0.8, 0, 0, 0.9, 0, 0.1, 0, 0], { root: 0, pcs: [0, 4, 7], bassPc: 0 });
+  const sr = 22050;
+  const x = ChordCore.synth(['C', 'Am7', 'Dm7', 'G7', 'C', 'Em', 'F', 'G'], sr, 1.5, { seed: 3, noise: 0.002 });
+  S.sample = { x, sr };
+  ChordCore.analyze(x, sr).then(res => { S.sampleRes = res; if (!S.res) loadSample(); });
+})();
+</script>
+
+</body>
+</html>
