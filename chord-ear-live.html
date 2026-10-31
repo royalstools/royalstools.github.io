@@ -80,6 +80,7 @@ body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.
 .chord .acc { font-size: .6em; vertical-align: baseline; position: relative; top: -.6em; margin: 0 .01em; }
 .chord sup .acc { font-size: .85em; top: -.1em; }
 .chord .slash { font-weight: 400; color: var(--ink-2); margin: 0 .03em; }
+.chord sub.oct { font-size: .38em; vertical-align: baseline; position: relative; top: .1em; margin-left: .05em; font-weight: 500; color: var(--ink-2); }
 .chord .nc { font-style: italic; font-weight: 500; color: var(--ink-2); font-size: .62em; }
 .words { margin-top: 10px; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); max-width: 100%; }
 
@@ -140,6 +141,8 @@ body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.
 .seg .lbl { display: block; font: italic 600 23px/1.1 var(--f-display); white-space: nowrap; }
 .seg .lbl sup { font-size: .55em; vertical-align: baseline; position: relative; top: -.75em; margin-left: .02em; }
 .seg .lbl .slash, .chip .lbl .slash { color: var(--ink-2); font-weight: 400; }
+.lbl.note { font-style: normal !important; }
+.lbl sub.oct { font-size: .55em; vertical-align: baseline; position: relative; top: .15em; margin-left: .04em; color: var(--ink-2); font-weight: 500; }
 .seg .lbl .nc { color: var(--ink-2); font-weight: 500; font-size: .8em; }
 .seg .at { display: block; font: 400 10.5px var(--f-mono); color: var(--ink-2); margin-top: 3px; font-variant-numeric: tabular-nums; }
 .seg:hover { background: color-mix(in srgb, var(--accent-soft) 50%, transparent); }
@@ -246,6 +249,7 @@ body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.
     <ul>
       <li><strong>One instrument, close to the mic.</strong> Drums, vocals and backing tracks blur the notes.</li>
       <li><strong>Let chords ring.</strong> Strummed or sustained chords read best; fast single-note runs come out as passing chords.</li>
+      <li><strong>Single notes show as notes.</strong> One note at a time comes up as its name and octave instead of a chord. E2 is the low E string, E4 the high one.</li>
       <li><strong>Same notes, different names.</strong> C6 and Am7 share every note, so Chord Ear goes by the lowest note to pick the name. Slash chords like C/E show a bass note other than the root.</li>
       <li><strong>No sound on an iPhone?</strong> Turn off silent mode. The chart follows along either way.</li>
       <li><strong>Tuning drift is fine.</strong> It measures how far your instrument sits from A440 and adjusts.</li>
@@ -328,10 +332,13 @@ const ChordCore = (() => {
     for (let k = kLo; k <= kHi; k++) if (mag[k] > max) max = mag[k];
     const out = [];
     if (max <= 0) return out;
-    const th = max * 0.0316; // -30 dB relative to the strongest peak
+    const th = max * 0.0316;    // -30 dB relative to the strongest peak
+    const thLow = max * 0.0079; // -42 dB under 140 Hz, where phone mics lose the low strings
+    const kLow = Math.floor(140 / binHz);
     for (let k = kLo; k <= kHi; k++) {
       const m = mag[k];
-      if (m > th && m > mag[k - 1] && m >= mag[k + 1]) {
+      if (m > (k < kLow ? thLow : th) && m > mag[k - 1] && m >= mag[k + 1]) {
+        if (k < kLow && (mag[k - 2] > 4 * m || mag[k + 2] > 4 * m || mag[k - 3] > 4 * m || mag[k + 3] > 4 * m)) continue; // window sidelobe
         const a = Math.log(mag[k - 1] + 1e-12), b = Math.log(m + 1e-12), cc = Math.log(mag[k + 1] + 1e-12);
         const d = a - 2 * b + cc;
         const p = d < 0 ? 0.5 * (a - cc) / d : 0;
@@ -354,12 +361,64 @@ const ChordCore = (() => {
   }
   const tuningFrom = acc => (acc[0] === 0 && acc[1] === 0) ? 0 : Math.atan2(acc[1], acc[0]) / (2 * Math.PI);
 
+  function peakNear(peaks, f, tol) {
+    let best = 0;
+    for (let i = 0; i < peaks.length; i += 2) {
+      const q = peaks[i];
+      if (q > f * (1 + tol)) break;
+      if (q >= f * (1 - tol) && peaks[i + 1] > best) best = peaks[i + 1];
+    }
+    return best;
+  }
+  // Lowest note actually sounding. A low string's fundamental is often weak, so a quiet low
+  // peak still counts when its 2nd and 3rd harmonics are there to back it up.
+  function bassPeak(peaks, tuning) {
+    let lowMax = 0;
+    for (let i = 0; i < peaks.length; i += 2) if (peaks[i] < 300 && peaks[i + 1] > lowMax) lowMax = peaks[i + 1];
+    if (!lowMax) return null;
+    const cand = []; let maxSal = 0;
+    for (let i = 0; i < peaks.length; i += 2) {
+      const f = peaks[i]; if (f >= 300) break; if (f < 55) continue;
+      const midi = 69 + 12 * Math.log2(f / 440) - tuning;
+      if (Math.abs(midi - Math.round(midi)) > 0.25) continue;
+      const r1 = peaks[i + 1];
+      const r2 = peakNear(peaks, 2 * f, 0.015), r3 = peakNear(peaks, 3 * f, 0.015);
+      const r4 = peakNear(peaks, 4 * f, 0.018), r5 = peakNear(peaks, 5 * f, 0.02);
+      const sal = Math.sqrt(r1) + 0.9 * Math.sqrt(r2) + 0.75 * Math.sqrt(r3) + 0.6 * Math.sqrt(r4) + 0.5 * Math.sqrt(r5);
+      const ok = r1 >= 0.15 * lowMax || (r2 >= 0.05 && r3 >= 0.05);
+      cand.push({ midi, sal, ok });
+      if (sal > maxSal) maxSal = sal;
+    }
+    for (const c of cand) if (c.ok && c.sal >= 0.4 * maxSal) return c;
+    return null;
+  }
+
+  // One note (any octaves of it): every strong peak sits on one harmonic series.
+  function monoPitch(peaks) {
+    let lo = -1, all = 0;
+    for (let i = 0; i < peaks.length; i += 2) if (peaks[i + 1] >= 0.08) { if (lo < 0) lo = i; all += peaks[i + 1]; }
+    if (lo < 0) return null;
+    for (let i = lo; i >= 0; i -= 2) {
+      const f0 = peaks[i];
+      if (f0 < 55) break;
+      if (peaks[i + 1] < 0.015) continue;
+      let ex = 0, tt = 0;
+      for (let j = 0; j < peaks.length; j += 2) {
+        const r = peaks[j + 1]; if (r < 0.05) continue;
+        const ratio = peaks[j] / f0; if (ratio > 8.5) break;
+        if (r >= 0.08) tt += r;
+        const n = Math.round(ratio);
+        if (n >= 1 && Math.abs(ratio / n - 1) < (n <= 4 ? 0.015 : 0.022)) { if (r >= 0.08) ex += r; }
+        else if (r >= 0.05 && peaks[j] < 4.2 * f0) { ex = -1; break; }
+      }
+      if (ex >= 0 && tt >= 0.6 * all && ex >= 0.9 * tt) return { midi: 69 + 12 * Math.log2(f0 / 440), frac: ex / tt };
+    }
+    return null;
+  }
+
   // chroma (12) + bass vote (12) from peaks
   function chromaFrom(peaks, tuning, chroma, bass) {
     chroma.fill(0); bass.fill(0);
-    let lowMax = 0;
-    for (let i = 0; i < peaks.length; i += 2) if (peaks[i] < 300 && peaks[i + 1] > lowMax) lowMax = peaks[i + 1];
-    let bassDone = false;
     for (let i = 0; i < peaks.length; i += 2) {
       const f = peaks[i], r = peaks[i + 1];
       const midi = 69 + 12 * Math.log2(f / 440) - tuning;
@@ -369,9 +428,9 @@ const ChordCore = (() => {
       const pc = ((n % 12) + 12) % 12;
       const v = Math.sqrt(r) * w;
       chroma[pc] += v;
-      // bass = lowest reasonably strong peak below ~D4
-      if (!bassDone && f < 300 && r >= 0.15 * lowMax && w > 0.5) { bass[pc] += Math.sqrt(r); bassDone = true; }
     }
+    const bp = bassPeak(peaks, tuning);
+    if (bp) bass[((Math.round(bp.midi) % 12) + 12) % 12] += 1;
   }
 
   // ---------- chord scoring ----------
@@ -417,7 +476,7 @@ const ChordCore = (() => {
 
   // ---------- whole-recording analysis ----------
   const SWITCH_PENALTY = 0.45;
-  const MIN_SEG = 0.4; // seconds
+  const MIN_SEG = 0.4, MIN_NOTE = 0.2; // seconds
   const yieldUI = () => new Promise(r => setTimeout(r, 0));
 
   async function analyze(x, sr, onProgress) {
@@ -449,11 +508,14 @@ const ChordCore = (() => {
     for (let f = 0; f < frames; f++) if (rmsDb[f] > maxDb - 20) tuningVector(peaksAll[f], tacc);
     const tuning = tuningFrom(tacc);
 
-    // pass 2: chroma + bass
+    // pass 2: chroma + bass + single-note check
     const rawC = new Float32Array(frames * 12), rawB = new Float32Array(frames * 12);
     const ch = new Float64Array(12), bs = new Float64Array(12);
+    const monoMidi = new Int16Array(frames).fill(-1), monoFrac = new Float32Array(frames);
     for (let f = 0; f < frames; f++) {
       if (silent[f]) continue;
+      const mp = monoPitch(peaksAll[f]);
+      if (mp) { monoMidi[f] = Math.round(mp.midi - tuning); monoFrac[f] = mp.frac; }
       chromaFrom(peaksAll[f], tuning, ch, bs);
       for (let i = 0; i < 12; i++) { rawC[f * 12 + i] = ch[i]; rawB[f * 12 + i] = bs[i]; }
     }
@@ -480,14 +542,18 @@ const ChordCore = (() => {
     }
 
     // scores + Viterbi
-    const S = NCH + 1;
+    // states: chords 0..NCH-1, no chord NCH, single notes NCH+1+pc
+    const NOTE0 = NCH + 1;
+    const S = NCH + 13;
     const scores = new Float32Array(frames * S);
     const tmp = new Float64Array(NCH);
     for (let f = 0; f < frames; f++) {
       if (silent[f]) { scores[f * S + NCH] = 0.6; continue; }
       scoreChroma(C.subarray(f * 12, f * 12 + 12), B.subarray(f * 12, f * 12 + 12), tmp);
-      for (let ci = 0; ci < NCH; ci++) scores[f * S + ci] = tmp[ci];
+      const mono = monoMidi[f] >= 0;
+      for (let ci = 0; ci < NCH; ci++) scores[f * S + ci] = mono ? tmp[ci] * 0.85 : tmp[ci];
       scores[f * S + NCH] = 0.25;
+      if (mono) scores[f * S + NOTE0 + (monoMidi[f] % 12)] = 0.95 + 0.05 * monoFrac[f];
     }
     onProgress && onProgress(0.92); await yieldUI();
     let dp = new Float64Array(S), nd = new Float64Array(S);
@@ -520,7 +586,7 @@ const ChordCore = (() => {
       changed = false;
       for (let i = 0; i < segs.length; i++) {
         const s = segs[i];
-        if ((s.f1 - s.f0 + 1) * hopSec >= MIN_SEG) continue;
+        if ((s.f1 - s.f0 + 1) * hopSec >= (s.ci >= NOTE0 ? MIN_NOTE : MIN_SEG)) continue;
         const prev = segs[i - 1], next = segs[i + 1];
         const into = !prev ? next : !next ? prev : ((prev.f1 - prev.f0) >= (next.f1 - next.f0) ? prev : next);
         if (into === prev) prev.f1 = s.f1; else next.f0 = s.f0;
@@ -536,6 +602,20 @@ const ChordCore = (() => {
       const end = i === segs.length - 1 ? duration : tOf(s.f1) + hopSec / 2;
       const seg = { start: Math.max(0, start), end: Math.min(duration, end), f0: s.f0, f1: s.f1, chord: null, score: 0, avg: new Float32Array(12) };
       if (s.ci === NCH) return seg;
+      if (s.ci >= NOTE0) {
+        const pc = s.ci - NOTE0, ms = []; let fr = 0;
+        for (let f = s.f0; f <= s.f1; f++) {
+          if (monoMidi[f] >= 0 && monoMidi[f] % 12 === pc) { ms.push(monoMidi[f]); fr += monoFrac[f]; }
+          for (let i = 0; i < 12; i++) seg.avg[i] += disp[f * 12 + i];
+        }
+        let am = 0; for (let i = 0; i < 12; i++) am = Math.max(am, seg.avg[i]);
+        if (am > 0) for (let i = 0; i < 12; i++) seg.avg[i] /= am;
+        ms.sort((a, b) => a - b);
+        const midi = ms.length ? ms[ms.length >> 1] : 48 + pc;
+        seg.chord = { root: pc, type: 'note', pcs: [pc], bass: null, bassPc: pc, midi };
+        seg.score = ms.length ? fr / ms.length : 0.7;
+        return seg;
+      }
       const ch = CHORDS[s.ci];
       // average score, display chroma and bass votes
       let sc = 0; const bv = new Float64Array(12);
@@ -572,9 +652,16 @@ const ChordCore = (() => {
       step(mag, binHz, loud) {
         const peaks = findPeaks(mag, binHz);
         if (loud) { const t = tuningVector(peaks, [0, 0]); tacc[0] = tacc[0] * 0.98 + t[0]; tacc[1] = tacc[1] * 0.98 + t[1]; }
-        chromaFrom(peaks, tuningFrom(tacc), ch, bs);
+        const tun = tuningFrom(tacc);
+        chromaFrom(peaks, tun, ch, bs);
         let m = 0; for (let i = 0; i < 12; i++) m = Math.max(m, ch[i]);
         for (let i = 0; i < 12; i++) { sm[i] = sm[i] * 0.55 + (m > 0 ? ch[i] / m : 0) * 0.45; sb[i] = sb[i] * 0.8 + bs[i] * 0.2; }
+        let dm0 = 0; for (let i = 0; i < 12; i++) dm0 = Math.max(dm0, sm[i]);
+        const mp = monoPitch(peaks);
+        if (mp) {
+          const midi = Math.round(mp.midi - tun), pc = ((midi % 12) + 12) % 12;
+          return { id: 10000 + midi, chord: { root: pc, type: 'note', pcs: [pc], bass: null, bassPc: pc, midi }, score: mp.frac, disp: Array.from(sm, v => dm0 > 0 ? v / dm0 : 0) };
+        }
         scoreChroma(sm, sb, sc);
         let bi = 0; for (let i = 1; i < NCH; i++) if (sc[i] > sc[bi]) bi = i;
         let bsum = 0, bmax = 0, bpc = -1;
@@ -612,9 +699,10 @@ const ChordCore = (() => {
         const ts = t0 + frac * secPerChord;
         const up = si % 2 === 1;
         const order = up ? [...notes].reverse() : notes;
-        order.forEach((midi, j) => {
+        order.forEach((nv, j) => {
+          const midi = Array.isArray(nv) ? nv[0] : nv, as = Array.isArray(nv) ? nv[1] : 1;
           const on = ts + j * 0.014 + rand() * 0.004;
-          const amp = (up ? 0.11 : 0.15) * (0.85 + 0.3 * rand());
+          const amp = as * (up ? 0.11 : 0.15) * (0.85 + 0.3 * rand());
           const f0 = 440 * Math.pow(2, (midi - 69) / 12);
           const n0 = Math.floor(on * sr);
           const nEnd = Math.min(len, Math.floor(tEnd * sr));
@@ -682,19 +770,23 @@ const ChordCore = (() => {
     }
     return { base, sup };
   }
+  const octOf = c => Math.floor(c.midi / 12) - 1;
   function chordHTML(c, big) {
     if (!c) return '<span class="nc">N.C.</span>';
+    if (c.type === 'note') return (big ? accHTML(S.sp[c.root]) : S.sp[c.root]) + '<sub class="oct">' + octOf(c) + '</sub>';
     const { base, sup } = chordParts(c);
     const a = big ? accHTML : (s => s);
     return a(S.sp[c.root]) + base + (sup ? '<sup>' + a(sup) + '</sup>' : '') + (c.bass != null ? '<span class="slash">/</span>' + a(S.sp[c.bass]) : '');
   }
   function chordText(c) {
     if (!c) return 'N.C.';
+    if (c.type === 'note') return S.sp[c.root] + octOf(c);
     const { base, sup } = chordParts(c);
     return S.sp[c.root] + base + sup + (c.bass != null ? '/' + S.sp[c.bass] : '');
   }
   function chordWords(c) {
     if (!c) return 'No chord';
+    if (c.type === 'note') return 'Single note · ' + S.sp[c.root] + octOf(c);
     let w = c.type === '5' ? S.sp[c.root] + ' power chord' : S.sp[c.root] + ' ' + WORDS[c.type];
     if (c.bass != null) w += ', ' + S.sp[c.bass] + ' in the bass';
     return w;
@@ -791,7 +883,7 @@ const ChordCore = (() => {
       const w = Math.max(MINW, (sg.end - sg.start) * PPS);
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'seg'; b.style.width = w + 'px';
-      b.innerHTML = '<span class="lbl">' + chordHTML(sg.chord, false) + '</span><span class="at">' + fmt(sg.start) + '</span>';
+      b.innerHTML = '<span class="lbl' + (sg.chord && sg.chord.type === 'note' ? ' note' : '') + '">' + chordHTML(sg.chord, false) + '</span><span class="at">' + fmt(sg.start) + '</span>';
       b.setAttribute('aria-label', chordWords(sg.chord) + ' at ' + fmt(sg.start));
       b.addEventListener('click', () => seek(sg.start + 0.001));
       strip.appendChild(b);
@@ -815,8 +907,8 @@ const ChordCore = (() => {
     for (const [k, v] of seen) {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'chip';
-      b.innerHTML = '<span class="lbl">' + chordHTML(v.c, false) + '</span>' + (v.n > 1 ? '<span class="n">×' + v.n + '</span>' : '');
-      b.setAttribute('aria-label', chordWords(v.c) + (v.n > 1 ? ', played ' + v.n + ' times' : '') + '. Jump to first');
+      b.innerHTML = '<span class="lbl' + (v.c.type === 'note' ? ' note' : '') + '">' + chordHTML(v.c, false) + '</span>' + (v.n > 1 ? '<span class="n">×' + v.n + '</span>' : '');
+      b.setAttribute('aria-label', chordWords(v.c) + (v.n > 1 ? ', played ' + v.n + ' times' : '') + '. Jump to the first one');
       b.addEventListener('click', () => { seek(r.segments[v.i].start + 0.001); scrollToSeg(v.i, true); });
       chips.appendChild(b);
     }
@@ -1042,7 +1134,7 @@ const ChordCore = (() => {
         L.shown = r.id; L.shownChord = r.chord;
         showChord(r.chord, r.score);
         L.hist.unshift(r.chord); if (L.hist.length > 8) L.hist.pop();
-        $('recent').innerHTML = L.hist.map(c => '<span class="lbl">' + chordHTML(c, false) + '</span>').join('');
+        $('recent').innerHTML = L.hist.map(c => '<span class="lbl' + (c.type === 'note' ? ' note' : '') + '">' + chordHTML(c, false) + '</span>').join('');
       } else if (r.id === L.shown) {
         const m = $('match');
         const q = r.score >= 0.85 ? 'clear' : r.score >= 0.65 ? 'likely' : 'unsure';
